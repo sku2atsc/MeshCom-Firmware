@@ -135,6 +135,7 @@ extern TinyGPSPlus gps;
 #include "gw_link_status.h"   // --info ...Server line
 #include "gw_reg_runtime.h"   // --info ...REGISTRATION line
 #include "nvs_diag.h"         // --info ...NVS line
+#include "blocked_calls.h"    // --blockcall (Sperrliste)
 
 #if defined(BOARD_T5_EPAPER)
 #include <t5-epaper/t5epaper_extern.h>
@@ -1430,6 +1431,7 @@ void commandAction(char *umsg_text, bool ble)
             #if defined(ENABLE_MSGSTORE)
             printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--stor on/off           announce mailbox calls to the server (STOR, default off)\n--mbox                  store-node mailbox contents\n");
             #endif
+            printdeb("--blockcall <list>/none blocked callsigns, not shown or relayed (CALL = all SSIDs)\n");
             printdeb("--mesh on/off           relay foreign frames\n");
             printdeb("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)\n");
             printdeb("--rmstrictsecurity on/off  RM brute-force protection (default off): per-sender lockout,\n"
@@ -4694,6 +4696,25 @@ void commandAction(char *umsg_text, bool ble)
     // storenotice must be tested before the bare "store"/"storenotice" below --
     // "store" (5 chars) alone would otherwise not reach them, but "storenotice"
     // (11 chars) as an exact token would shadow "storenotice " if reordered.
+    // Sperrliste (blocked_calls.h): --blockcall CALL1,CALL2 / none / ohne Wert anzeigen.
+    if(commandCheck(msg_text+2, (char*)"blockcall ") == 0)
+    {
+        if(!blockListSet(msg_text+12))
+        {
+            Serial.printf("[ERR];blockcall;invalid entry or more than %d entries\n", BLOCKLIST_MAX);
+            return;
+        }
+        blockListSave();
+        Serial.printf("[BLOCK];list;%s\n", blockListCsv());
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"blockcall") == 0)
+    {
+        Serial.printf("[BLOCK];list;%s\n", blockListCsv());
+        return;
+    }
+    else
 #if defined(ENABLE_MSGSTORE)
     if(commandCheck(msg_text+2, (char*)"storecall ") == 0)
     {

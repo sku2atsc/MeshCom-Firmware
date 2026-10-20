@@ -2,6 +2,7 @@
  *  @author      Ralph Weich (DD5RW)
  *  @date        2025-12-03
  */
+#include "blocked_calls.h"   // Sperrliste: Setup-Karte "Blocked callsigns"
 #include "mc_text.h"
 #include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include <Arduino.h>
@@ -3806,6 +3807,20 @@ void sub_page_setup()
     web_client.println("</div>"); // cardbody
     web_client.println("</div>");
 #endif
+
+    // Sperrliste (blocked_calls.h): Rufzeichen, deren Frames verworfen und nicht
+    // weitergeleitet werden. Gleiches Muster wie die Store-Karte oben.
+    web_client.println("<div class=\"cardlayout collapsablecard\">");
+    web_client.println("<label class=\"cardlabel\">Blocked callsigns</label>");
+    web_client.println("<span>Open this to see and edit the callsigns this node ignores.</span>\n");
+    web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
+    web_client.println("<div class=\"cardbody\">");
+    web_client.println("<div class=\"grid grid3\">");
+    _create_setup_textinput_element("blockcall", "Blocked callsigns (comma separated, up to 16)", blockListCsv(), "NF0JN,XX1ABC-12", "blockcall", BLOCKLIST_CSV_MAX, false, false);
+    web_client.println("</div>");
+    web_client.println("<div class=\"mbx-warn\">Frames <b>from</b> or <b>relayed by</b> a listed callsign are dropped: not shown, not uploaded, not relayed. A callsign without SSID (<b>NF0JN</b>) blocks all its SSIDs, with SSID (<b>NF0JN-12</b>) only that one. An empty field clears the list.</div>");
+    web_client.println("</div>"); // cardbody
+    web_client.println("</div>");
 
     // Config Backup / Restore Section (CS-03)
     // The download is a plain navigation to /config.json -- the response

@@ -8,6 +8,7 @@ This file contains all web-based setup functions
 #include <loop_functions_extern.h>
 #include <command_setters.h> // cmdDecimalComma
 #if defined(ENABLE_MSGSTORE)
+#include <blocked_calls.h> // Sperrliste: blockcall setparam mapping
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
 #endif
 #include <string>
@@ -554,6 +555,25 @@ void webSetup_setParam(setupStruct *setupData){
         commandAction(message_text, bPhoneReady);
         setupData->returnCode = (bNoMSGtoALL == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = bNoMSGtoALL?"on":"off";
+        return;
+    } else
+
+    // Sperrliste (blocked_calls.h): wie storecall ueber den Konsolenbefehl, damit
+    // Web-GUI und Konsole nicht auseinanderlaufen. Leeres Feld = Liste leeren.
+    if(setupData->paramName.equals("blockcall")) {
+        String want = setupData->paramValue;
+        want.trim();
+        if(want.length() == 0)
+            want = "none";
+        snprintf(message_text, sizeof(message_text), "--blockcall %s", want.c_str());
+        commandAction(message_text, bPhoneReady);
+        String norm = want;
+        norm.toUpperCase();
+        norm.replace(" ", "");
+        if(norm.equals("NONE"))
+            norm = "";
+        setupData->returnCode = norm.equals(blockListCsv())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = blockListCsv();
         return;
     } else
 
@@ -1159,6 +1179,11 @@ void webSetup_getParam(setupStruct *setupData){
 
     if(setupData->paramName.equals("nomsgall")) {
         setupData->returnValue = bNoMSGtoALL?"on":"off";
+        return;
+    } else
+
+    if(setupData->paramName.equals("blockcall")) {
+        setupData->returnValue = blockListCsv();
         return;
     } else
 

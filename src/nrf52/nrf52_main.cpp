@@ -134,6 +134,7 @@ void sendHeartbeat();
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"
 #include "msgstore_settings.h"
+#include "blocked_calls.h"     // Sperrliste (--blockcall)
 #endif
 #include <regex_functions.h>
 #include "onrx_stats.h" // OR-STAT
@@ -649,6 +650,9 @@ void nrf52setup()
     msgstoreGlueInit();
     msgstoreSettingsLoad();
 #endif
+
+    // Sperrliste (blocked_calls.h): gespeicherte Liste laden, sonst Standard.
+    blockListLoad();
 
     // RM-05 (#1189): remote-management state (high-water mark from its own flash file), after the
     // settings load so node_call/node_passwd are final.

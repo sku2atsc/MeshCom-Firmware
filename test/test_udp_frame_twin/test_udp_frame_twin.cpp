@@ -397,6 +397,7 @@ static void record_sink(const char *sink, const std::string &detail)
     g_sink_log.push_back(SinkCall{sink, sink_sanitize(detail)});
 }
 
+void logRxDropBlocked(const char *) {}   // Sperrliste: im Twin ohne Bedeutung
 void logRxDropUnconfigured(const char *call)
 {
     g_dropped.push_back(call ? call : "(null)");
