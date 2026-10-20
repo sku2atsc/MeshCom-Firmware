@@ -209,7 +209,7 @@ enum FwChannel : uint8_t
 // Unknown values fall back to prod.
 inline const char *fwChannelRepo(FwChannel c)
 {
-    return c == FW_CH_DEV ? "DK5EN/MeshCom-Firmware" : "icssw-org/MeshCom-Firmware";
+    return c == FW_CH_DEV ? "sku2atsc/MeshCom-Firmware" : "icssw-org/MeshCom-Firmware";
 }
 
 // ---------------------------------------------------------------------------

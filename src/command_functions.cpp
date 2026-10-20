@@ -1411,7 +1411,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
             #if defined(ESP32)
-            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
+            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DM3KS\n--update check/install/status/apply  firmware update now (ESP32)\n");
             #endif
             printdeb("--conffin               send config-finished to app\n");
             delay(100);

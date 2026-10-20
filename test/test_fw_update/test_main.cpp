@@ -208,7 +208,7 @@ static void test_compare_invalid_is_zero(void)
 static void test_channel_repos(void)
 {
     TEST_ASSERT_EQUAL_STRING("icssw-org/MeshCom-Firmware", fwChannelRepo(FW_CH_PROD));
-    TEST_ASSERT_EQUAL_STRING("DK5EN/MeshCom-Firmware", fwChannelRepo(FW_CH_DEV));
+    TEST_ASSERT_EQUAL_STRING("sku2atsc/MeshCom-Firmware", fwChannelRepo(FW_CH_DEV));
     TEST_ASSERT_EQUAL_UINT8(0, FW_CH_PROD);
     TEST_ASSERT_EQUAL_UINT8(1, FW_CH_DEV);
     // an out-of-range stored value falls back to prod
