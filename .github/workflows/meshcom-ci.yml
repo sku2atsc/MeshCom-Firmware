@@ -216,7 +216,9 @@ jobs:
           echo ">"
           echo "> **Wer nicht direkt davon betroffen ist, verwendet bitte die offizielle Firmware:** [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware/releases) bzw. den Build von [DK5EN](https://github.com/DK5EN/MeshCom-Firmware/releases). Dies ist **kein** offizielles Release."
           echo
-          echo "Basis: [DK5EN/MeshCom-Firmware](https://github.com/DK5EN/MeshCom-Firmware) \`$TAG\`, unveraendert bis auf die unten aufgefuehrten Punkte."
+          echo "### What this release is"
+          echo
+          echo "DK5EN \`$TAG\` plus Sperrliste. Inhalt und Neuerungen des Basis-Release: siehe [DK5EN $TAG](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/$TAG)."
           echo
           echo "### Unterschiede zum DK5EN-Build $TAG"
           echo
@@ -243,7 +245,7 @@ jobs:
           echo
           echo "Komplett-Flashen (Safeboot, Bootloader, Partitionen, otadata) wie bei DK5EN: die uebrigen Dateien unter **Assets**."
           echo
-          echo "Gebaut von GitHub Actions aus Commit \`${GITHUB_SHA:0:8}\`. Original-Release-Notes: [DK5EN $TAG](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/$TAG)."
+          echo "Gebaut von GitHub Actions aus Commit \`${GITHUB_SHA:0:8}\`."
         } > release-notes-fork.md
         cat release-notes-fork.md
 
