@@ -53,6 +53,8 @@ extern String strSource_call;
 extern bool had_initial_udp_conn;
 extern IPAddress node_hostip;
 void logRxDropUnconfigured(const char *call);
+void logRxDropBlocked(const char *path);
+#include "blocked_calls.h"
 
 // UDP functions
 // DR-20 (2026-09-12 decided, implemented 2026-09-17 wave W6): returns a
@@ -202,6 +204,15 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           bool bSrcUnconfigured = isUnconfiguredCall(source_call);
           if(bSrcUnconfigured)
               logRxDropUnconfigured(source_call);
+
+          // Lokale Sperrliste (blocked_calls.h): gesperrte Quelle/Relais wie eine
+          // unkonfigurierte Quelle behandeln -- kein Senden auf LoRa, kein KISS,
+          // keine Anzeige.
+          if(!bSrcUnconfigured && isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
+          {
+              logRxDropBlocked(aprsmsg.msg_source_path);
+              bSrcUnconfigured = true;
+          }
 
           // TM-31: read the dedup gate BEFORE the position branch below inserts
           // this msg_id into the ring. It used to be evaluated after that insert,

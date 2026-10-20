@@ -29,6 +29,7 @@
 #include "hey_echo_upload.h"  // gateway upload of own HEY echoes
 #include "onrx_stats.h"     // OR-STAT: OnRxDone time histogram for the STAT line
 #if defined(ENABLE_MSGSTORE)
+#include "blocked_calls.h"   // lokale Sperrliste (NF0JN-11/-12)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
 #endif
@@ -301,6 +302,29 @@ void logRxDropUnconfigured(const char *call)
     {
         Serial.printf("[RX];drop;unconfigured;src;%s;ms;%lu;dropped;%lu\n",
                       call, (unsigned long)now, (unsigned long)s_dropped_since_marker);
+        s_have_marker = true;
+        s_last_marker_ms = now;
+        s_dropped_since_marker = 0;
+    }
+}
+
+// Sperrliste (blocked_calls.h): eigener Zaehler, gleiche Drosselung wie oben.
+uint32_t stat_rx_drop_blocked = 0;
+
+void logRxDropBlocked(const char *path)
+{
+    static bool s_have_marker = false;
+    static uint32_t s_last_marker_ms = 0;
+    static uint32_t s_dropped_since_marker = 0;
+
+    stat_rx_drop_blocked++;
+    s_dropped_since_marker++;
+
+    uint32_t now = (uint32_t)millis();
+    if(!s_have_marker || (uint32_t)(now - s_last_marker_ms) >= 10000UL)
+    {
+        Serial.printf("[RX];drop;blocked;path;%s;ms;%lu;dropped;%lu\n",
+                      path, (unsigned long)now, (unsigned long)s_dropped_since_marker);
         s_have_marker = true;
         s_last_marker_ms = now;
         s_dropped_since_marker = 0;
@@ -1455,6 +1479,22 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             {
                 setlogFormatRly(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
                                 aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, "unconf", 0, -1);
+                setlogPrint(setlog_buf);
+            }
+        }
+        else if(isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
+        {
+            // Lokale Sperrliste (blocked_calls.h): Quelle oder Relais ohne
+            // Lizenz -- verwerfen wie RX-01 oben: keine Anzeige, kein
+            // Phone/BLE, kein Server-Upload, kein Relay. Der Frame wird
+            // NICHT in den Dedup-Ring eingetragen, eine saubere Kopie
+            // desselben Frames ueber ein anderes Relais bleibt also gueltig.
+            logRxDropBlocked(aprsmsg.msg_source_path);
+
+            if(bDisplayLog && !rx_dup)
+            {
+                setlogFormatRly(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
+                                aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, "blocked", 0, -1);
                 setlogPrint(setlog_buf);
             }
         }

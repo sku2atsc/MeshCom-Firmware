@@ -56,6 +56,8 @@ extern bool hasExternIPaddress;
 // DR-02: shared with the ESP32 copy (lora_functions.cpp defines it,
 // udp_frame_esp32.cpp:40 already externs it the same way).
 void logRxDropUnconfigured(const char *call);
+void logRxDropBlocked(const char *path);
+#include "blocked_calls.h"
 
 /**@brief C1 carve-out (DRY unification U1): everything that happens once a
  * datagram is in the buffer -- no socket, no NTP, no DHCP. Returns 0 when the
@@ -195,6 +197,15 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
           bool bSrcUnconfigured = isUnconfiguredCall(source_call);
           if(bSrcUnconfigured)
               logRxDropUnconfigured(source_call);
+
+          // Lokale Sperrliste (blocked_calls.h): gesperrte Quelle/Relais wie eine
+          // unkonfigurierte Quelle behandeln -- kein Senden auf LoRa, kein KISS,
+          // keine Anzeige.
+          if(!bSrcUnconfigured && isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
+          {
+              logRxDropBlocked(aprsmsg.msg_source_path);
+              bSrcUnconfigured = true;
+          }
 
           bool bUDPtoLoraSend = !bSrcUnconfigured;
 
