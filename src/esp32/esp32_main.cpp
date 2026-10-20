@@ -142,8 +142,8 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"
 #include "msgstore_settings.h"
-#include "blocked_calls.h"     // Sperrliste (--blockcall)
 #endif
+#include "blocked_calls.h"     // Sperrliste (--blockcall)
 #include <regex_functions.h>
 #include <test_inject.h>
 #include <command_functions.h>

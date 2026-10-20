@@ -28,8 +28,8 @@
 #include "rm_rx_gate.h"     // RM: the one receive hook, shared with the server ingress
 #include "hey_echo_upload.h"  // gateway upload of own HEY echoes
 #include "onrx_stats.h"     // OR-STAT: OnRxDone time histogram for the STAT line
+#include "blocked_calls.h"   // lokale Sperrliste (--blockcall)
 #if defined(ENABLE_MSGSTORE)
-#include "blocked_calls.h"   // lokale Sperrliste (NF0JN-11/-12)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
 #endif

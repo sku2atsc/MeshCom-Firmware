@@ -134,8 +134,8 @@ void sendHeartbeat();
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"
 #include "msgstore_settings.h"
-#include "blocked_calls.h"     // Sperrliste (--blockcall)
 #endif
+#include "blocked_calls.h"     // Sperrliste (--blockcall)
 #include <regex_functions.h>
 #include "onrx_stats.h" // OR-STAT
 #include "setlog_lines.h"

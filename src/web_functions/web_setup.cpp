@@ -7,8 +7,8 @@ This file contains all web-based setup functions
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <command_setters.h> // cmdDecimalComma
-#if defined(ENABLE_MSGSTORE)
 #include <blocked_calls.h> // Sperrliste: blockcall setparam mapping
+#if defined(ENABLE_MSGSTORE)
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
 #endif
 #include <string>
