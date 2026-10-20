@@ -123,12 +123,17 @@ static bool parseList(const char *csv, BlockList &out)
         out.count++;
     }
 
+    // CSV von Hand zusammensetzen: strncat() auf Strukturfelder loest bei
+    // GCC 8.4 (xtensa) ein falsches -Wrestrict aus, das mit -Werror bricht.
+    size_t pos = 0;
     for (uint8_t i = 0; i < out.count; i++)
     {
-        if (i)
-            strncat(out.csv, ",", sizeof(out.csv) - strlen(out.csv) - 1);
-        strncat(out.csv, out.call[i], sizeof(out.csv) - strlen(out.csv) - 1);
+        if (i && pos + 1 < sizeof(out.csv))
+            out.csv[pos++] = ',';
+        for (const char *c = out.call[i]; *c && pos + 1 < sizeof(out.csv); c++)
+            out.csv[pos++] = *c;
     }
+    out.csv[pos] = 0;
     return true;
 }
 
