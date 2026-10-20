@@ -40,6 +40,12 @@ on:
         required: false
         default: ''
 
+# Boards fuer den Build. Leer ("") = alle Boards aus default_envs wie bei DK5EN.
+# Zurzeit nur eine Auswahl, damit der Lauf schnell bleibt; die Safeboot-Envs
+# liefern safeboot/bootloader/partitions fuer das Komplett-Flashen.
+env:
+  BUILD_ENVS: "heltec_wifi_lora_32_V3 ttgo_tbeam LilyGo_T-Beam-1W esp32-safeboot esp32-S3-safeboot"
+
 jobs:
   build:
 
@@ -86,6 +92,7 @@ jobs:
       run: pip install --upgrade intelhex
 
     - name: Install RAK Deps
+      if: env.BUILD_ENVS == ''
       run: pio platform install nordicnrf52
 
     # Patch not needed anymore. Is now statically. 
@@ -114,7 +121,10 @@ jobs:
       run: |
         set -o pipefail
         cd ${{ github.workspace }}
-        if ! pio run 2>&1 | tee build.log; then
+        ARGS=""
+        for e in $BUILD_ENVS; do ARGS="$ARGS -e $e"; done
+        echo "pio run$ARGS"
+        if ! pio run $ARGS 2>&1 | tee build.log; then
           echo "::warning::FAILED envs: $(grep -E '[[:space:]]FAILED[[:space:]]' build.log | awk '{print $1}' | tr '\n' ' ')"
           grep -E 'error:|undefined reference|multiple definition' build.log | grep -v '\*\*\*' | sort -u | head -9 | while IFS= read -r l; do echo "::error::$l"; done
           grep -m1 -B3 -A12 -E 'error:' build.log | tr '\n' '|' | cut -c1-3000 | sed 's/^/::error::CTX /'
@@ -122,12 +132,15 @@ jobs:
         fi
 
     - name: Convert RAK to UF2
+      if: env.BUILD_ENVS == ''
       run: "wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2conv.py && wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2families.json && python3 uf2conv.py .pio/build/wiscore_rak4631/firmware.hex -c -o .pio/build/wiscore_rak4631/wiscore_rak4631.uf2 -f 0xADA52840"
 
     - name: Convert HELTEC_T114 to UF2
+      if: env.BUILD_ENVS == ''
       run: "wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2conv.py && wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2families.json && python3 uf2conv.py .pio/build/heltec_t114/firmware.hex -c -o .pio/build/heltec_t114/heltec_t114.uf2 -f 0xADA52840"
 
     - name: Convert T_ECHO to UF2
+      if: env.BUILD_ENVS == ''
       run: "wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2conv.py && wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2families.json && python3 uf2conv.py .pio/build/t_echo/firmware.hex -c -o .pio/build/t_echo/t_echo.uf2 -f 0xADA52840"
 
     - name: Rename Files
@@ -173,10 +186,12 @@ jobs:
         echo "$apps"
         n=$(echo "$apps" | wc -l)
         echo "ESP32 app images: $n"
-        [ "$n" -eq 27 ] || { echo "::error::expected 27 ESP32 app images, found $n"; exit 1; }
+        if [ -z "$BUILD_ENVS" ]; then
+          [ "$n" -eq 27 ] || { echo "::error::expected 27 ESP32 app images, found $n"; exit 1; }
+        fi
         python3 tools/make_autoupdate.py --check $apps
         z=$(ls .pio/build/*/*.autoupdate | wc -l)
-        [ "$z" -eq 27 ] || { echo "::error::expected 27 .autoupdate files, found $z"; exit 1; }
+        [ "$z" -eq "$n" ] || { echo "::error::expected $n .autoupdate files, found $z"; exit 1; }
 
     - name: Tag auf den gepatchten Commit setzen
       # Lehnt GitHub das Verschieben ab, bleibt das Tag am Upstream-Commit;
