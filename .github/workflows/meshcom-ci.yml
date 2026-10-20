@@ -110,7 +110,15 @@ jobs:
       env:
         # release tags carry their name into the image (AU-D16); proof tags build undated
         MC_BUILD_TAG: ${{ steps.tag.outputs.tag }}
-      run: "cd ${{ github.workspace }} && pio run"
+      # Fehler als Annotations ausgeben (im Fork lesbar, auch ohne Log-Zugriff)
+      run: |
+        set -o pipefail
+        cd ${{ github.workspace }}
+        if ! pio run 2>&1 | tee build.log; then
+          echo "::warning::FAILED envs: $(grep -E '[[:space:]]FAILED[[:space:]]' build.log | awk '{print $1}' | tr '\n' ' ')"
+          grep -E 'error:|undefined reference|multiple definition|\*\*\* ' build.log | sort -u | head -10 | while IFS= read -r l; do echo "::error::$l"; done
+          exit 1
+        fi
 
     - name: Convert RAK to UF2
       run: "wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2conv.py && wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2families.json && python3 uf2conv.py .pio/build/wiscore_rak4631/firmware.hex -c -o .pio/build/wiscore_rak4631/wiscore_rak4631.uf2 -f 0xADA52840"
