@@ -211,12 +211,23 @@ jobs:
         {
           echo "## MeshCom-Firmware $TAG mit Sperrliste (DM3KS)"
           echo
-          echo "Inoffizieller Build auf Basis von [DK5EN/MeshCom-Firmware](https://github.com/DK5EN/MeshCom-Firmware) \`$TAG\`, ergaenzt um eine lokale **Sperrliste**:"
+          echo "> [!WARNING]"
+          echo "> **Dieser Build existiert nur aus einem Grund:** Im Umkreis von **DB0SD** sendet derzeit eine Station ohne Amateurfunklizenz (Pirat) ins MeshCom-Netz. Diese Firmware verwirft deren Aussendungen, damit sie nicht weiter durchs Mesh transportiert werden."
+          echo ">"
+          echo "> **Wer nicht direkt davon betroffen ist, verwendet bitte die offizielle Firmware:** [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware/releases) bzw. den Build von [DK5EN](https://github.com/DK5EN/MeshCom-Firmware/releases). Dies ist **kein** offizielles Release."
           echo
-          echo "- Frames **von** oder **ueber** ein gesperrtes Rufzeichen werden verworfen: keine Anzeige, kein Server-Upload, kein Weiterleiten im Mesh."
-          echo "- Standard: \`NF0JN\` (alle SSIDs). Ein Eintrag ohne SSID sperrt alle SSIDs, mit SSID (z.B. \`XX1ABC-12\`) nur diese."
-          echo "- Bearbeiten: Web-GUI -> Setup -> **Blocked callsigns**, oder Konsole \`--blockcall NF0JN,...\` / \`--blockcall none\`."
-          echo "- Auto-Update-Kanal **dev** (\`--updchan dev\`, \"notify (dev, DM3KS releases)\") zeigt auf diesen Fork."
+          echo "Basis: [DK5EN/MeshCom-Firmware](https://github.com/DK5EN/MeshCom-Firmware) \`$TAG\`, unveraendert bis auf die unten aufgefuehrten Punkte."
+          echo
+          echo "### Unterschiede zum DK5EN-Build $TAG"
+          echo
+          echo "1. **Sperrliste (neu).** Frames, deren Absender **oder** ein Relais im Pfad auf der Liste steht, werden beim Empfang verworfen: keine Anzeige, keine Weitergabe an App/BLE, kein Upload zum Server, **kein Weiterleiten im Mesh**. Auf einem Gateway werden solche Frames ausserdem nicht vom Server auf LoRa gesendet. Konsole: \`[RX];drop;blocked;...\`."
+          echo "2. **Standard-Eintrag \`NF0JN\`** (gilt fuer alle SSIDs). Ein Eintrag ohne SSID sperrt alle SSIDs, mit SSID (z.B. \`XX1ABC-12\`) nur diese. Bis zu 16 Eintraege."
+          echo "3. **Web-GUI:** neue Karte Setup -> **Blocked callsigns** zum Ansehen und Bearbeiten der Liste."
+          echo "4. **Konsole:** neuer Befehl \`--blockcall CALL1,CALL2\`, \`--blockcall none\` (leeren), \`--blockcall\` (anzeigen). Die Liste wird dauerhaft gespeichert (ESP32: NVS, nRF52: Datei) und ueberlebt Neustart und Update."
+          echo "5. **Auto-Update-Kanal dev** (\`--updchan dev\`, Web-GUI \"notify (dev, DM3KS releases)\") zeigt auf **diesen Fork** statt auf DK5EN. Der Kanal **prod** zeigt weiterhin auf die offizielle Firmware von icssw-org (dann ohne Sperrliste)."
+          echo "6. **Nur ausgewaehlte Boards** gebaut (siehe Tabelle), nicht alle 27 wie bei DK5EN."
+          echo
+          echo "Alles andere (Funktionen, Einstellungen, Protokoll) entspricht DK5EN \`$TAG\`. Die Einstellungen bleiben beim Wechsel erhalten."
           echo
           echo "### Firmware zum Download"
           echo
