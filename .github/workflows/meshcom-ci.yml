@@ -203,14 +203,38 @@ jobs:
         git push -f origin "refs/tags/$TAG"
 
     - name: Release-Text
+      env:
+        TAG: ${{ steps.tag.outputs.tag }}
+        REPO: ${{ github.repository }}
       run: |
+        U="https://github.com/$REPO/releases/download/$TAG"
         {
-          echo "**Fork von DM3KS mit lokaler Sperrliste** (src/blocked_calls.h): Frames von oder ueber NF0JN-11 / NF0JN-12 werden verworfen und nicht weitergeleitet. Update-Kanal \"dev\" zeigt auf diesen Fork."
+          echo "## MeshCom-Firmware $TAG mit Sperrliste (DM3KS)"
           echo
-          echo "---"
+          echo "Inoffizieller Build auf Basis von [DK5EN/MeshCom-Firmware](https://github.com/DK5EN/MeshCom-Firmware) \`$TAG\`, ergaenzt um eine lokale **Sperrliste**:"
           echo
-          cat release-notes.md
+          echo "- Frames **von** oder **ueber** ein gesperrtes Rufzeichen werden verworfen: keine Anzeige, kein Server-Upload, kein Weiterleiten im Mesh."
+          echo "- Standard: \`NF0JN\` (alle SSIDs). Ein Eintrag ohne SSID sperrt alle SSIDs, mit SSID (z.B. \`XX1ABC-12\`) nur diese."
+          echo "- Bearbeiten: Web-GUI -> Setup -> **Blocked callsigns**, oder Konsole \`--blockcall NF0JN,...\` / \`--blockcall none\`."
+          echo "- Auto-Update-Kanal **dev** (\`--updchan dev\`, \"notify (dev, DM3KS releases)\") zeigt auf diesen Fork."
+          echo
+          echo "### Firmware zum Download"
+          echo
+          echo "| Board | Firmware (.bin) | Auto-Update |"
+          echo "|---|---|---|"
+          for f in .pio/build/*/*.bin; do
+            n=$(basename "$f")
+            case "$n" in firmware.bin|bootloader*.bin|partitions.bin|otadata.bin|safeboot*.bin) continue;; esac
+            b="${n%.bin}"
+            a=""; [ -f "$(dirname "$f")/$b.autoupdate" ] && a="[$b.autoupdate]($U/$b.autoupdate)"
+            echo "| $b | [$n]($U/$n) | $a |"
+          done
+          echo
+          echo "Komplett-Flashen (Safeboot, Bootloader, Partitionen, otadata) wie bei DK5EN: die uebrigen Dateien unter **Assets**."
+          echo
+          echo "Gebaut von GitHub Actions aus Commit \`${GITHUB_SHA:0:8}\`. Original-Release-Notes: [DK5EN $TAG](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/$TAG)."
         } > release-notes-fork.md
+        cat release-notes-fork.md
 
     - uses: ncipollo/release-action@v1
       with:
