@@ -116,7 +116,8 @@ jobs:
         cd ${{ github.workspace }}
         if ! pio run 2>&1 | tee build.log; then
           echo "::warning::FAILED envs: $(grep -E '[[:space:]]FAILED[[:space:]]' build.log | awk '{print $1}' | tr '\n' ' ')"
-          grep -E 'error:|undefined reference|multiple definition|\*\*\* ' build.log | sort -u | head -10 | while IFS= read -r l; do echo "::error::$l"; done
+          grep -E 'error:|undefined reference|multiple definition' build.log | grep -v '\*\*\*' | sort -u | head -9 | while IFS= read -r l; do echo "::error::$l"; done
+          grep -m1 -B3 -A12 -E 'error:' build.log | tr '\n' '|' | cut -c1-3000 | sed 's/^/::error::CTX /'
           exit 1
         fi
 
