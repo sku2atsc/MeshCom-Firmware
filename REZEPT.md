@@ -9,18 +9,19 @@ Dieser Branch enthaelt **keinen Firmware-Code**, sondern nur das Rezept:
 
 | Datei | Zweck |
 |---|---|
-| `patches/` | Aenderungen gegenueber DK5EN (Auto-Update-Kanal, Sperrliste) |
+| `patches/` | Aenderungen gegenueber DK5EN (Auto-Update-Kanal, Voreinstellung der Sperrliste) |
 | `boards.txt` | welche Boards gebaut werden |
 | `.github/workflows/build.yml` | holt DK5EN, wendet die Patches an, baut parallel, veroeffentlicht |
 | `tools/collect_assets.sh` | benennt die Build-Ergebnisse wie bei DK5EN |
 | `tools/release_notes.sh` | Release-Text |
 
-## Uebergabe-Modus (aktiv)
+## Uebergabe-Modus (derzeit aus)
 
-Solange die Datei `UEBERGABE` existiert, wird **nicht** gebaut: der Workflow
-kopiert jedes neue DK5EN-Release unveraendert hierher. Knoten, die noch diesen
-Fork als Update-Quelle (`--updchan dev`) haben, installieren es und zeigen danach
-wieder auf DK5EN. `UEBERGABE` loeschen = zurueck zum Bauen mit den Patches.
+Legt man eine Datei `UEBERGABE` an, wird **nicht** mehr gebaut: der Workflow
+kopiert dann jedes neue DK5EN-Release unveraendert hierher. Knoten mit diesem
+Fork als Update-Quelle (`--updchan dev`) installieren es und zeigen danach
+wieder auf DK5EN. Gedacht fuer den Zeitpunkt, an dem die MCApp die Sperrliste
+anzeigen und bearbeiten kann.
 
 ## Ablauf (Normalbetrieb)
 

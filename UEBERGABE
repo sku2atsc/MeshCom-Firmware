@@ -1,7 +1,0 @@
-Uebergabe-Modus aktiv (seit 2026-10-24).
-
-Die Sperrliste ist seit DK5EN v4.40a.10.23 fester Bestandteil der DK5EN-Firmware.
-Der Workflow baut deshalb nichts mehr, sondern uebernimmt DK5EN-Releases unveraendert,
-damit Knoten mit diesem Fork als Update-Quelle (dev) wieder auf DK5EN umgestellt werden.
-
-Datei loeschen = zurueck zum Bauen mit den Patches aus patches/.

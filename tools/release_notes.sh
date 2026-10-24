@@ -47,18 +47,15 @@ cat <<EOF
 
 ### What this release is
 
-DK5EN \`$BASE\` plus Sperrliste. Inhalt und Neuerungen des Basis-Release: siehe [DK5EN $BASE]($D).
+DK5EN \`$BASE\` mit zwei kleinen Ergaenzungen (siehe unten). Inhalt und Neuerungen des Basis-Release: siehe [DK5EN $BASE]($D). Die **Sperrliste** selbst (Web-GUI, \`--blockcall\`, Fernwartung) ist seit \`v4.40a.10.23\` Teil der DK5EN-Firmware.
 
 ### Unterschiede zum DK5EN-Build $BASE
 
-1. **Sperrliste (neu).** Frames, deren Absender **oder** ein Relais im Pfad auf der Liste steht, werden beim Empfang verworfen: keine Anzeige, keine Weitergabe an App/BLE, kein Upload zum Server, **kein Weiterleiten im Mesh**. Auf einem Gateway werden solche Frames ausserdem nicht vom Server auf LoRa gesendet. Konsole: \`[RX];drop;blocked;...\`.
-2. **Voreingestellt** ist das betroffene Rufzeichen (alle SSIDs). Ein Eintrag ohne SSID sperrt alle SSIDs, mit SSID (z.B. \`XX1ABC-12\`) nur diese. Bis zu 16 Eintraege.
-3. **Web-GUI:** neue Karte Setup -> **Blocked callsigns** zum Ansehen und Bearbeiten der Liste.
-4. **Konsole:** neuer Befehl \`--blockcall CALL1,CALL2\`, \`--blockcall none\` (leeren), \`--blockcall\` (anzeigen). Die Liste wird dauerhaft gespeichert (ESP32: NVS, nRF52: Datei) und ueberlebt Neustart und Update.
-5. **Auto-Update-Kanal dev** (\`--updchan dev\`, Web-GUI "notify (dev, DM3KS releases)") zeigt auf **diesen Fork** statt auf DK5EN. Der Kanal **prod** zeigt weiterhin auf die offizielle Firmware von icssw-org (dann ohne Sperrliste).
-6. **Nur ausgewaehlte Boards** gebaut (siehe Tabelle), nicht alle wie bei DK5EN.
+1. **Voreinstellung der Sperrliste:** Auf einem Knoten, auf dem noch **nie** eine Sperrliste gespeichert war, wird beim ersten Start einmalig das betroffene Rufzeichen (alle SSIDs) eingetragen und gespeichert. Eine schon vorhandene oder bewusst geleerte Liste bleibt unveraendert.
+2. **Auto-Update-Kanal dev** (\`--updchan dev\`, Web-GUI "notify (dev, DM3KS releases)") zeigt auf **diesen Fork** statt auf DK5EN. Der Kanal **prod** zeigt weiterhin auf die offizielle Firmware von icssw-org.
+3. **Nur ausgewaehlte Boards** gebaut (siehe Tabelle), nicht alle wie bei DK5EN.
 
-Alles andere (Funktionen, Einstellungen, Protokoll) entspricht DK5EN \`$BASE\`. Die Einstellungen bleiben beim Wechsel erhalten.
+Alles andere (Funktionen, Einstellungen, Protokoll) entspricht DK5EN \`$BASE\`. Die Einstellungen bleiben beim Wechsel erhalten; eine im Fork gespeicherte Sperrliste wird uebernommen.
 
 ### Firmware zum Download
 

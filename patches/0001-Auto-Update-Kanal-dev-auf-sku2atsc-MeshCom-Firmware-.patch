@@ -12,10 +12,10 @@ Subject: [PATCH 1/2] Auto-Update: Kanal dev auf sku2atsc/MeshCom-Firmware
  4 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/src/command_functions.cpp b/src/command_functions.cpp
-index 7f172823..415e19d5 100644
+index 4914aa7f..2718c91c 100644
 --- a/src/command_functions.cpp
 +++ b/src/command_functions.cpp
-@@ -1411,7 +1411,7 @@ void commandAction(char *umsg_text, bool ble)
+@@ -1412,7 +1412,7 @@ void commandAction(char *umsg_text, bool ble)
              printdeb("--ota-update            reboot into safeboot OTA\n");
              #endif
              #if defined(ESP32)
@@ -25,7 +25,7 @@ index 7f172823..415e19d5 100644
              printdeb("--conffin               send config-finished to app\n");
              delay(100);
 diff --git a/src/fw_update.h b/src/fw_update.h
-index 619f6fe5..46b33976 100644
+index e1c6b98c..0d308f3b 100644
 --- a/src/fw_update.h
 +++ b/src/fw_update.h
 @@ -209,7 +209,7 @@ enum FwChannel : uint8_t
@@ -38,10 +38,10 @@ index 619f6fe5..46b33976 100644
  
  // ---------------------------------------------------------------------------
 diff --git a/src/web_functions/web_functions.cpp b/src/web_functions/web_functions.cpp
-index 9b0fc46c..a70a8e63 100644
+index 7e60ed80..d6ad4900 100644
 --- a/src/web_functions/web_functions.cpp
 +++ b/src/web_functions/web_functions.cpp
-@@ -3521,7 +3521,7 @@ void sub_page_setup()
+@@ -3530,7 +3530,7 @@ void sub_page_setup()
          web_client.printf("<select id=\"aumode\" name=\"aumode\"%s onchange=\"setvalue('aumode',this.value,true);\">\r\n", au_sb_ok ? "" : " disabled");
          // D3: notify (prod), notify (dev), auto greyed. A console-set auto shows greyed and selected.
          web_client.printf("\t<option value=\"prod\" %s>notify (prod, icssw-org releases)</option>\n", (au_mode != 2 && au_chan == 0) ? "selected" : "");
@@ -51,7 +51,7 @@ index 9b0fc46c..a70a8e63 100644
          web_client.println("</select>");
          web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto: coming soon -- for now the node notifies only. Install new firmware from the Info page.</p>");
 diff --git a/test/test_fw_update/test_main.cpp b/test/test_fw_update/test_main.cpp
-index fd96aaf3..48328c57 100644
+index d4e89e1c..835bb78f 100644
 --- a/test/test_fw_update/test_main.cpp
 +++ b/test/test_fw_update/test_main.cpp
 @@ -208,7 +208,7 @@ static void test_compare_invalid_is_zero(void)
