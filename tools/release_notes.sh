@@ -14,6 +14,29 @@ DIR="$5"
 U="https://github.com/$REPO/releases/download/$TAG"
 D="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/$BASE"
 
+if [ "${MIRROR:-0}" = 1 ]; then
+cat <<EOF
+## MeshCom-Firmware $TAG -- Uebergabe an DK5EN
+
+> [!IMPORTANT]
+> **Dies ist das unveraenderte Release [DK5EN $BASE]($D)**, nur hierher kopiert. Die Sperrliste ist seit \`$BASE\` fester Bestandteil der Firmware von DK5EN, dieser Fork wird nicht mehr gebraucht.
+
+### What this release is
+
+DK5EN \`$BASE\`, Byte fuer Byte. Inhalt und Neuerungen: siehe [DK5EN $BASE]($D).
+
+### Fuer Knoten, die bisher diesen Fork verwendet haben
+
+- Nach der Installation zeigt der Auto-Update-Kanal **dev** (\`--updchan dev\`) wieder auf **DK5EN**. Kuenftige Updates kommen direkt von dort.
+- Eine **gespeicherte Sperrliste wird uebernommen** (beim ersten Start einmalig migriert).
+- **Wichtig:** Die Voreinstellung aus dem Fork gilt in der DK5EN-Firmware nicht. Wurde die Liste nie gespeichert, ist sie nach dem Update **leer**. Bitte nach dem Update pruefen und ggf. neu setzen (Web-GUI Setup, \`--blockcall <CALL>\` oder per Fernwartung).
+
+### Firmware zum Download
+
+| Board | Firmware | Auto-Update |
+|---|---|---|
+EOF
+else
 cat <<EOF
 ## MeshCom-Firmware $TAG mit Sperrliste (DM3KS)
 
@@ -42,6 +65,7 @@ Alles andere (Funktionen, Einstellungen, Protokoll) entspricht DK5EN \`$BASE\`. 
 | Board | Firmware | Auto-Update |
 |---|---|---|
 EOF
+fi
 
 shopt -s nullglob
 for f in "$DIR"/*.bin; do
@@ -59,6 +83,14 @@ for f in "$DIR"/*.uf2; do
   [ -e "$DIR/$b.zip" ] && z=", [$b.zip]($U/$b.zip)"
   echo "| $b | [$n]($U/$n)$z | |"
 done
+
+if [ "${MIRROR:-0}" = 1 ]; then
+cat <<EOF
+
+Komplett-Flashen: die uebrigen Dateien unter **Assets** bzw. der [Web-Flasher von DK5EN](https://dk5en.github.io/MeshCom-Firmware/flash/).
+EOF
+exit 0
+fi
 
 cat <<EOF
 

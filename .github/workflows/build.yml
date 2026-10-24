@@ -11,6 +11,10 @@ name: Firmware mit Sperrliste
 #     Workflow -> Neubau; nur Release-Text geaendert -> nur Text aktualisieren.
 #
 # Jedes Board wird in einem eigenen Job parallel gebaut.
+#
+# UEBERGABE-MODUS: Existiert die Datei UEBERGABE im Repo, wird NICHT gebaut,
+# sondern das DK5EN-Release unveraendert (ohne Patches) uebernommen. Knoten,
+# die es installieren, zeigen mit dem Kanal "dev" danach wieder auf DK5EN.
 
 on:
   schedule:
@@ -92,7 +96,7 @@ jobs:
               CHANGED=ALL
             fi
             echo "Geaendert:"; echo "$CHANGED"
-            if echo "$CHANGED" | grep -Eq '^(ALL$|patches/|boards\.txt$|tools/collect_assets\.sh$|\.github/workflows/)'; then
+            if echo "$CHANGED" | grep -Eq '^(ALL$|UEBERGABE$|patches/|boards\.txt$|tools/collect_assets\.sh$|\.github/workflows/)'; then
               MODE=build
             elif echo "$CHANGED" | grep -Eq '^tools/release_notes\.sh$'; then
               MODE=notes
@@ -100,6 +104,11 @@ jobs:
         esac
         # Text aktualisieren geht nur, wenn es das Release schon gibt
         [ "$MODE" = notes ] && [ "$HAVE" = no ] && MODE=build
+        # Uebergabe-Modus: DK5EN-Release unveraendert uebernehmen statt bauen
+        if [ -f UEBERGABE ] && [ "$MODE" = build ]; then
+          MODE=mirror
+          [ -z "${INPUT_TAG:-}" ] || { echo "::error::Im Uebergabe-Modus gilt immer der DK5EN-Tag"; exit 1; }
+        fi
 
         MATRIX=$(python3 - <<'EOF'
         import json
@@ -248,6 +257,42 @@ jobs:
         replacesArtifacts: true
         artifacts: "assets/*"
 
+  mirror:
+    needs: plan
+    if: needs.plan.outputs.mode == 'mirror'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: DK5EN-Release ${{ needs.plan.outputs.base }} herunterladen
+      env:
+        GH_TOKEN: ${{ github.token }}
+        BASE: ${{ needs.plan.outputs.base }}
+      run: |
+        mkdir assets
+        gh release download "$BASE" -R DK5EN/MeshCom-Firmware -D assets
+        ls -la assets
+        n=$(ls assets | wc -l)
+        [ "$n" -gt 0 ] || { echo "::error::DK5EN-Release $BASE hat keine Dateien"; exit 1; }
+        MIRROR=1 bash tools/release_notes.sh "$BASE" "$BASE" "$GITHUB_REPOSITORY" "$GITHUB_SHA" assets > notes.md
+        cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+    - uses: ncipollo/release-action@v1
+      with:
+        tag: ${{ needs.plan.outputs.base }}
+        commit: ${{ github.sha }}
+        name: ${{ needs.plan.outputs.base }} (Uebergabe an DK5EN)
+        bodyFile: notes.md
+        allowUpdates: true
+        draft: false
+        prerelease: false
+        makeLatest: true
+        removeArtifacts: true
+        replacesArtifacts: true
+        artifacts: "assets/*"
+
   notes:
     needs: plan
     if: needs.plan.outputs.mode == 'notes'
@@ -265,7 +310,8 @@ jobs:
         mkdir names
         gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[].name' | while read -r n; do touch "names/$n"; done
         ls names
-        bash tools/release_notes.sh "$TAG" "${{ needs.plan.outputs.base }}" "$GITHUB_REPOSITORY" "$GITHUB_SHA" names > notes.md
+        M=0; [ -f UEBERGABE ] && M=1
+        MIRROR=$M bash tools/release_notes.sh "$TAG" "${{ needs.plan.outputs.base }}" "$GITHUB_REPOSITORY" "$GITHUB_SHA" names > notes.md
         cat notes.md >> "$GITHUB_STEP_SUMMARY"
 
     - uses: ncipollo/release-action@v1

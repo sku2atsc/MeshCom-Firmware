@@ -15,7 +15,14 @@ Dieser Branch enthaelt **keinen Firmware-Code**, sondern nur das Rezept:
 | `tools/collect_assets.sh` | benennt die Build-Ergebnisse wie bei DK5EN |
 | `tools/release_notes.sh` | Release-Text |
 
-## Ablauf
+## Uebergabe-Modus (aktiv)
+
+Solange die Datei `UEBERGABE` existiert, wird **nicht** gebaut: der Workflow
+kopiert jedes neue DK5EN-Release unveraendert hierher. Knoten, die noch diesen
+Fork als Update-Quelle (`--updchan dev`) haben, installieren es und zeigen danach
+wieder auf DK5EN. `UEBERGABE` loeschen = zurueck zum Bauen mit den Patches.
+
+## Ablauf (Normalbetrieb)
 
 1. **Taeglich** prueft der Workflow das neueste Release von DK5EN.
 2. Gibt es hier noch kein Release mit diesem Tag, wird DK5EN ausgecheckt, die
