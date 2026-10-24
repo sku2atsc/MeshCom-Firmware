@@ -1,0 +1,277 @@
+name: Firmware mit Sperrliste
+
+# Baut DK5EN/MeshCom-Firmware mit den Patches aus patches/ fuer die Boards aus
+# boards.txt und veroeffentlicht das Ergebnis als Release in diesem Repo.
+#
+# Ausloeser:
+#   - taeglich (Zeitplan): gibt es bei DK5EN ein neues Release, das hier noch
+#     fehlt, wird es automatisch gebaut und veroeffentlicht.
+#   - per Hand: Actions -> "Firmware mit Sperrliste" -> Run workflow.
+#   - Push auf main: Aenderungen an patches/, boards.txt, Build-Skript oder
+#     Workflow -> Neubau; nur Release-Text geaendert -> nur Text aktualisieren.
+#
+# Jedes Board wird in einem eigenen Job parallel gebaut.
+
+on:
+  schedule:
+  - cron: '17 5 * * *'   # taeglich 05:17 UTC (07:17 MESZ / 06:17 MEZ)
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'DK5EN-Tag als Basis (leer = neuestes DK5EN-Release)'
+        required: false
+        default: ''
+      tag:
+        description: 'Eigener Release-Tag (leer = wie Basis). Format v4.40a.MM.DD'
+        required: false
+        default: ''
+      force:
+        description: 'Auch neu bauen, wenn das Release schon existiert'
+        type: boolean
+        default: false
+  push:
+    branches:
+    - main
+
+concurrency:
+  group: firmware-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.p.outputs.mode }}
+      base: ${{ steps.p.outputs.base }}
+      tag: ${{ steps.p.outputs.tag }}
+      matrix: ${{ steps.p.outputs.matrix }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Was ist zu tun?
+      id: p
+      env:
+        GH_TOKEN: ${{ github.token }}
+        EVENT: ${{ github.event_name }}
+        INPUT_BASE: ${{ github.event.inputs.base }}
+        INPUT_TAG: ${{ github.event.inputs.tag }}
+        INPUT_FORCE: ${{ github.event.inputs.force }}
+        BEFORE: ${{ github.event.before }}
+        AFTER: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        # Strenges Tag-Format der Firmware (fwParseTag): vX.YYz oder vX.YYz.MM.DD
+        RE='^v[0-9]{1,3}\.[0-9]{1,3}[a-z](\.[0-9]{1,2}\.[0-9]{1,2})?$'
+
+        BASE="${INPUT_BASE:-}"
+        if [ -z "$BASE" ]; then
+          BASE=$(gh api repos/DK5EN/MeshCom-Firmware/releases/latest --jq .tag_name)
+        fi
+        echo "$BASE" | grep -Eq "$RE" || { echo "::error::DK5EN-Tag '$BASE' hat kein gueltiges Format"; exit 1; }
+        TAG="${INPUT_TAG:-}"
+        [ -n "$TAG" ] || TAG="$BASE"
+        echo "$TAG" | grep -Eq "$RE" || { echo "::error::Release-Tag '$TAG' hat nicht das Format v4.40a.MM.DD"; exit 1; }
+
+        HAVE=no
+        gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" >/dev/null 2>&1 && HAVE=yes
+
+        MODE=skip
+        case "$EVENT" in
+          schedule)
+            [ "$HAVE" = no ] && MODE=build ;;
+          workflow_dispatch)
+            if [ "$INPUT_FORCE" = true ] || [ "$HAVE" = no ]; then MODE=build; else MODE=notes; fi ;;
+          push)
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ] \
+               || ! CHANGED=$(git diff --name-only "$BEFORE" "$AFTER"); then
+              CHANGED=ALL
+            fi
+            echo "Geaendert:"; echo "$CHANGED"
+            if echo "$CHANGED" | grep -Eq '^(ALL$|patches/|boards\.txt$|tools/collect_assets\.sh$|\.github/workflows/)'; then
+              MODE=build
+            elif echo "$CHANGED" | grep -Eq '^tools/release_notes\.sh$'; then
+              MODE=notes
+            fi ;;
+        esac
+        # Text aktualisieren geht nur, wenn es das Release schon gibt
+        [ "$MODE" = notes ] && [ "$HAVE" = no ] && MODE=build
+
+        MATRIX=$(python3 - <<'EOF'
+        import json
+        envs = []
+        for line in open('boards.txt'):
+            line = line.split('#', 1)[0].strip()
+            if line and line not in envs:
+                envs.append(line)
+        envs += ['esp32-safeboot', 'esp32-S3-safeboot']
+        print(json.dumps(envs))
+        EOF
+        )
+
+        echo "Ereignis=$EVENT Basis=$BASE Tag=$TAG schon-vorhanden=$HAVE -> $MODE"
+        echo "Boards: $MATRIX"
+        {
+          echo "mode=$MODE"
+          echo "base=$BASE"
+          echo "tag=$TAG"
+          echo "matrix=$MATRIX"
+        } >> "$GITHUB_OUTPUT"
+        echo "### $MODE: DK5EN \`$BASE\` -> Release \`$TAG\` (vorhanden: $HAVE)" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.mode == 'build'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.env }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: recipe
+
+    - name: DK5EN ${{ needs.plan.outputs.base }} holen
+      uses: actions/checkout@v4
+      with:
+        repository: DK5EN/MeshCom-Firmware
+        ref: ${{ needs.plan.outputs.base }}
+        path: fw
+        fetch-depth: 0   # volle Historie: noetig fuer git am -3 (Drei-Wege-Merge)
+
+    - name: Patches anwenden
+      env:
+        BASE: ${{ needs.plan.outputs.base }}
+      run: |
+        cd fw
+        git config user.name DM3KS
+        git config user.email sku2atsc@users.noreply.github.com
+        for p in ../recipe/patches/*.patch; do
+          if ! git am -3 "$p"; then
+            echo "::error::Patch $(basename "$p") laesst sich nicht auf DK5EN $BASE anwenden -- Patch muss angepasst werden"
+            git am --abort || true
+            exit 1
+          fi
+        done
+        git log --oneline -n 4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.platformio/.cache
+        key: pio-${{ matrix.env }}-${{ hashFiles('fw/platformio.ini') }}
+        restore-keys: |
+          pio-${{ matrix.env }}-
+
+    - name: PlatformIO installieren
+      run: pip install --upgrade platformio intelhex
+
+    - name: T-Beam Supreme Board-Definition
+      if: matrix.env == 'ttgo_tbeam_supreme'
+      run: |
+        pio platform install espressif32
+        mkdir -p ~/.platformio/platforms/espressif32/boards
+        wget -q -O ~/.platformio/platforms/espressif32/boards/t-beams3-supreme.json https://raw.githubusercontent.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/master/boards/t-beams3-supreme.json
+
+    - name: Bauen
+      env:
+        MC_BUILD_TAG: ${{ needs.plan.outputs.tag }}
+        ENV_NAME: ${{ matrix.env }}
+      run: |
+        set -o pipefail
+        cd fw
+        if ! pio run -e "$ENV_NAME" 2>&1 | tee build.log; then
+          grep -E 'error:|undefined reference|multiple definition' build.log | grep -v '\*\*\*' | sort -u | head -9 | while IFS= read -r l; do echo "::error::$l"; done
+          exit 1
+        fi
+
+    - name: UF2-Werkzeug (nRF52)
+      if: contains(fromJSON('["wiscore_rak4631","heltec_t114","t_echo"]'), matrix.env)
+      run: |
+        wget -q -O recipe/tools/uf2conv.py https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2conv.py
+        wget -q -O recipe/tools/uf2families.json https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2families.json
+
+    - name: Dateien einsammeln
+      run: bash recipe/tools/collect_assets.sh "${{ matrix.env }}" fw out
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: asset-${{ matrix.env }}
+        path: out/
+        retention-days: 30
+
+  release:
+    needs: [plan, build]
+    if: needs.plan.outputs.mode == 'build'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: asset-*
+        path: assets
+        merge-multiple: true
+
+    - name: Release-Text
+      run: |
+        ls -la assets
+        cd assets && sha256sum * > ../SHA256SUMS.txt && cd ..
+        mv SHA256SUMS.txt assets/
+        bash tools/release_notes.sh "${{ needs.plan.outputs.tag }}" "${{ needs.plan.outputs.base }}" "$GITHUB_REPOSITORY" "$GITHUB_SHA" assets > notes.md
+        cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+    - uses: ncipollo/release-action@v1
+      with:
+        tag: ${{ needs.plan.outputs.tag }}
+        commit: ${{ github.sha }}
+        name: ${{ needs.plan.outputs.tag }} (Sperrliste DM3KS)
+        bodyFile: notes.md
+        allowUpdates: true
+        draft: false
+        prerelease: false
+        makeLatest: true
+        removeArtifacts: true
+        replacesArtifacts: true
+        artifacts: "assets/*"
+
+  notes:
+    needs: plan
+    if: needs.plan.outputs.mode == 'notes'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Release-Text neu erzeugen
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ needs.plan.outputs.tag }}
+      run: |
+        mkdir names
+        gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[].name' | while read -r n; do touch "names/$n"; done
+        ls names
+        bash tools/release_notes.sh "$TAG" "${{ needs.plan.outputs.base }}" "$GITHUB_REPOSITORY" "$GITHUB_SHA" names > notes.md
+        cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+    - uses: ncipollo/release-action@v1
+      with:
+        tag: ${{ needs.plan.outputs.tag }}
+        bodyFile: notes.md
+        allowUpdates: true
+        omitNameDuringUpdate: true
+        removeArtifacts: false

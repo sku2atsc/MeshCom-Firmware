@@ -1,0 +1,718 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: DM3KS <sku2atsc@users.noreply.github.com>
+Date: Sat, 24 Oct 2026 10:39:42 +0200
+Subject: [PATCH 2/2] Sperrliste: Rufzeichen verwerfen und nicht weiterleiten
+ (--blockcall, Web-GUI)
+
+---
+ platformio.ini                                |   1 +
+ src/blocked_calls.cpp                         | 310 ++++++++++++++++++
+ src/blocked_calls.h                           |  53 +++
+ src/command_functions.cpp                     |  21 ++
+ src/esp32/esp32_main.cpp                      |   4 +
+ src/esp32/udp_frame_esp32.cpp                 |  11 +
+ src/lora_functions.cpp                        |  40 +++
+ src/nrf52/nrf52_main.cpp                      |   4 +
+ src/nrf52/udp_frame_nrf52.cpp                 |  11 +
+ src/web_functions/web_functions.cpp           |  15 +
+ src/web_functions/web_setup.cpp               |  25 ++
+ .../test_udp_frame_twin.cpp                   |   1 +
+ 12 files changed, 496 insertions(+)
+ create mode 100644 src/blocked_calls.cpp
+ create mode 100644 src/blocked_calls.h
+
+diff --git a/platformio.ini b/platformio.ini
+index bf7461d1..8862aa5e 100644
+--- a/platformio.ini
++++ b/platformio.ini
+@@ -1318,6 +1318,7 @@ build_src_filter =
+ 	+<remote_cmd.cpp>
+ 	+<hmac_sha256.cpp>
+ 	+<gw_link_status.cpp>
++	+<blocked_calls.cpp>
+ 	+<esp32/udp_frame_esp32.cpp>
+ 	+<nrf52/udp_frame_nrf52.cpp>
+ 
+diff --git a/src/blocked_calls.cpp b/src/blocked_calls.cpp
+new file mode 100644
+index 00000000..fd71009c
+--- /dev/null
++++ b/src/blocked_calls.cpp
+@@ -0,0 +1,310 @@
++// blocked_calls.cpp -- lokale Sperrliste, siehe blocked_calls.h.
++#include "blocked_calls.h"
++
++#include <string.h>
++#include <stdio.h>
++
++#if defined(ARDUINO)
++#include <Arduino.h>
++#include <configuration.h>
++#endif
++
++// ---------------------------------------------------------------------------
++// Liste im RAM. Zwei Puffer: OnRxDone() liest im LoRa-Task, Web-GUI und
++// Konsole schreiben im Loop-Task. Geschrieben wird immer in den gerade nicht
++// aktiven Puffer, danach wird nur der Index umgeschaltet -- der Leser sieht
++// also stets eine vollstaendige Liste.
++// ---------------------------------------------------------------------------
++
++struct BlockList
++{
++    char    call[BLOCKLIST_MAX][BLOCKLIST_CALL_MAX];
++    uint8_t count;
++    char    csv[BLOCKLIST_CSV_MAX];
++};
++
++static BlockList s_list[2];
++static volatile uint8_t s_active = 0;
++static bool s_initialised = false;
++
++static char upperC(char c)
++{
++    return (c >= 'a' && c <= 'z') ? (char)(c - 'a' + 'A') : c;
++}
++
++static bool isAlnumC(char c)
++{
++    return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
++}
++
++// Eintrag pruefen: 1..9 Zeichen A-Z0-9, optional "-" und 1..2 Ziffern.
++static bool entryValid(const char *e)
++{
++    size_t len = strlen(e);
++    if (len == 0 || len >= BLOCKLIST_CALL_MAX)
++        return false;
++    const char *dash = strchr(e, '-');
++    size_t base = dash ? (size_t)(dash - e) : len;
++    if (base == 0 || base > 9)
++        return false;
++    for (size_t i = 0; i < base; i++)
++        if (!isAlnumC(e[i]))
++            return false;
++    if (dash)
++    {
++        size_t sl = len - base - 1;
++        if (sl < 1 || sl > 2)
++            return false;
++        for (size_t i = base + 1; i < len; i++)
++            if (e[i] < '0' || e[i] > '9')
++                return false;
++    }
++    return true;
++}
++
++// Parst csv in out. false bei ungueltigem Eintrag oder zu vielen Eintraegen.
++static bool parseList(const char *csv, BlockList &out)
++{
++    memset(&out, 0, sizeof(out));
++    if (csv == NULL)
++        return true;
++
++    // "none" (beliebige Schreibweise, ggf. mit Leerzeichen) = leere Liste
++    {
++        char tmp[8] = {0};
++        size_t j = 0;
++        for (const char *p = csv; *p && j < sizeof(tmp) - 1; p++)
++            if (*p != ' ')
++                tmp[j++] = upperC(*p);
++        if (strcmp(tmp, "NONE") == 0 && strlen(csv) < 16)
++            return true;
++    }
++
++    const char *p = csv;
++    while (*p)
++    {
++        char tok[BLOCKLIST_CALL_MAX + 1];
++        size_t tl = 0;
++        bool tooLong = false;
++        // fuehrende Leerzeichen ueberspringen
++        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')
++            p++;
++        while (*p && *p != ',' && *p != ';')
++        {
++            char c = *p++;
++            if (tl < BLOCKLIST_CALL_MAX)
++                tok[tl++] = upperC(c);
++            else
++                tooLong = true;
++        }
++        if (*p)
++            p++; // Trenner
++        // abschliessende Leerzeichen entfernen; Leerzeichen IM Rufzeichen
++        // bleiben stehen und machen den Eintrag ungueltig
++        while (tl > 0 && (tok[tl - 1] == ' ' || tok[tl - 1] == '\t' || tok[tl - 1] == '\r' || tok[tl - 1] == '\n'))
++            tl--;
++        tok[tl] = 0;
++        if (tl == 0)
++            continue; // leere Eintraege ("A,,B", Komma am Ende) ignorieren
++        if (tooLong || !entryValid(tok))
++            return false;
++
++        // Doppelte Eintraege nur einmal uebernehmen
++        bool dup = false;
++        for (uint8_t i = 0; i < out.count; i++)
++            if (strcmp(out.call[i], tok) == 0)
++                dup = true;
++        if (dup)
++            continue;
++
++        if (out.count >= BLOCKLIST_MAX)
++            return false;
++        memcpy(out.call[out.count], tok, tl + 1);
++        out.count++;
++    }
++
++    // CSV von Hand zusammensetzen: strncat() auf Strukturfelder loest bei
++    // GCC 8.4 (xtensa) ein falsches -Wrestrict aus, das mit -Werror bricht.
++    size_t pos = 0;
++    for (uint8_t i = 0; i < out.count; i++)
++    {
++        if (i && pos + 1 < sizeof(out.csv))
++            out.csv[pos++] = ',';
++        for (const char *c = out.call[i]; *c && pos + 1 < sizeof(out.csv); c++)
++            out.csv[pos++] = *c;
++    }
++    out.csv[pos] = 0;
++    return true;
++}
++
++static void ensureInit(void)
++{
++    if (s_initialised)
++        return;
++    parseList(BLOCKLIST_DEFAULT, s_list[0]);
++    s_active = 0;
++    s_initialised = true;
++}
++
++bool blockListSet(const char *csv)
++{
++    ensureInit();
++    uint8_t next = (uint8_t)(s_active ^ 1);
++    BlockList tmp;
++    if (!parseList(csv, tmp))
++        return false;
++    s_list[next] = tmp;
++    s_active = next;
++    return true;
++}
++
++const char *blockListCsv(void)
++{
++    ensureInit();
++    return s_list[s_active].csv;
++}
++
++// ---------------------------------------------------------------------------
++// Abgleich
++// ---------------------------------------------------------------------------
++
++// tok[0..tlen) gegen einen Eintrag (bereits in Grossbuchstaben).
++static bool tokenMatches(const char *tok, size_t tlen, const char *entry)
++{
++    while (tlen > 0 && (tok[tlen - 1] == '*' || tok[tlen - 1] == ' '))
++        tlen--;
++    while (tlen > 0 && tok[0] == ' ')
++    {
++        tok++;
++        tlen--;
++    }
++    if (tlen == 0)
++        return false;
++
++    size_t elen = strlen(entry);
++    bool entryHasSsid = strchr(entry, '-') != NULL;
++
++    size_t tbase = 0;
++    while (tbase < tlen && tok[tbase] != '-')
++        tbase++;
++
++    size_t cmplen = entryHasSsid ? tlen : tbase;
++    if (cmplen != elen)
++        return false;
++    for (size_t i = 0; i < elen; i++)
++        if (upperC(tok[i]) != entry[i])
++            return false;
++    return true;
++}
++
++static bool tokenBlocked(const char *tok, size_t tlen)
++{
++    ensureInit();
++    const BlockList &l = s_list[s_active];
++    for (uint8_t i = 0; i < l.count; i++)
++        if (tokenMatches(tok, tlen, l.call[i]))
++            return true;
++    return false;
++}
++
++bool isBlockedCall(const char *call)
++{
++    if (call == NULL || call[0] == 0)
++        return false;
++    return tokenBlocked(call, strlen(call));
++}
++
++bool isBlockedInPath(const char *path)
++{
++    if (path == NULL)
++        return false;
++    const char *start = path;
++    for (const char *p = path;; p++)
++    {
++        if (*p == ',' || *p == 0)
++        {
++            if (p > start && tokenBlocked(start, (size_t)(p - start)))
++                return true;
++            if (*p == 0)
++                break;
++            start = p + 1;
++        }
++    }
++    return false;
++}
++
++// ---------------------------------------------------------------------------
++// Speicherung
++// ---------------------------------------------------------------------------
++
++#if defined(ESP32)
++
++#include <Preferences.h>
++
++static Preferences s_block_prefs;
++
++void blockListLoad(void)
++{
++    ensureInit();
++    s_block_prefs.begin("Credentials", true);
++    bool have = s_block_prefs.isKey("block_list");
++    String v = have ? s_block_prefs.getString("block_list", "") : String("");
++    s_block_prefs.end();
++
++    if (have && !blockListSet(v.c_str()))
++        blockListSet(BLOCKLIST_DEFAULT); // kaputter Eintrag: Standard
++}
++
++void blockListSave(void)
++{
++    s_block_prefs.begin("Credentials", false);
++    s_block_prefs.putString("block_list", String(blockListCsv()));
++    s_block_prefs.end();
++}
++
++#elif defined(BOARD_RAK4630) || defined(NRF52_SERIES)
++
++#include <Adafruit_LittleFS.h>
++#include <InternalFileSystem.h>
++using namespace Adafruit_LittleFS_Namespace;
++
++static const char kBlockFileName[] = "/blocklist.cfg";
++static const char kBlockMagic[] = "BLK1:";
++
++void blockListLoad(void)
++{
++    ensureInit();
++    InternalFS.begin();
++    File f(InternalFS);
++    f.open(kBlockFileName, FILE_O_READ);
++    if (!f)
++        return; // nie gespeichert: Standard bleibt
++    char buf[BLOCKLIST_CSV_MAX + 8];
++    memset(buf, 0, sizeof(buf));
++    f.read((uint8_t *)buf, sizeof(buf) - 1);
++    f.close();
++    size_t ml = strlen(kBlockMagic);
++    if (strncmp(buf, kBlockMagic, ml) != 0 || !blockListSet(buf + ml))
++        blockListSet(BLOCKLIST_DEFAULT);
++}
++
++void blockListSave(void)
++{
++    InternalFS.begin();
++    InternalFS.remove(kBlockFileName);
++    File f(InternalFS);
++    if (f.open(kBlockFileName, FILE_O_WRITE))
++    {
++        f.write((const uint8_t *)kBlockMagic, strlen(kBlockMagic));
++        const char *csv = blockListCsv();
++        f.write((const uint8_t *)csv, strlen(csv));
++        f.close();
++    }
++}
++
++#else // Host-Tests
++
++void blockListLoad(void) { ensureInit(); }
++void blockListSave(void) {}
++
++#endif
+diff --git a/src/blocked_calls.h b/src/blocked_calls.h
+new file mode 100644
+index 00000000..3b032569
+--- /dev/null
++++ b/src/blocked_calls.h
+@@ -0,0 +1,53 @@
++#ifndef _BLOCKED_CALLS_H_
++#define _BLOCKED_CALLS_H_
++
++// Lokale Sperrliste (Rufzeichen ohne Lizenz).
++//
++// Frames, deren QUELLE ein gesperrtes Rufzeichen ist, ODER deren Pfad ein
++// gesperrtes Rufzeichen als Relais enthaelt, werden beim Empfang verworfen:
++// keine Anzeige, kein Upload zum Server, kein Relay ins Mesh. Auf einem
++// Gateway werden solche Frames ausserdem nicht vom Server auf LoRa gesendet.
++//
++// Eintrag OHNE SSID ("NF0JN")     sperrt alle SSIDs dieses Rufzeichens.
++// Eintrag MIT SSID ("NF0JN-12")   sperrt genau dieses Rufzeichen.
++// Vergleich ohne Beachtung von Gross-/Kleinschreibung.
++//
++// Die Liste ist zur Laufzeit aenderbar (--blockcall, Web-GUI "Setup" ->
++// "Blocked callsigns") und wird dauerhaft gespeichert: ESP32 im NVS
++// ("Credentials"/"block_list"), nRF52 in der Datei /blocklist.cfg.
++// Solange nie etwas gespeichert wurde, gilt BLOCKLIST_DEFAULT.
++
++#include <stddef.h>
++#include <stdint.h>
++
++#define BLOCKLIST_MAX       16   // Eintraege
++#define BLOCKLIST_CALL_MAX  13   // je Eintrag inkl. NUL ("ABCDEFGHI-99")
++#define BLOCKLIST_CSV_MAX   (BLOCKLIST_MAX * BLOCKLIST_CALL_MAX)
++#define BLOCKLIST_DEFAULT   "NF0JN"
++
++// Laden beim Start (nach dem Flash-Init) und Speichern.
++void blockListLoad(void);
++void blockListSave(void);
++
++// Setzt die Liste aus "CALL1,CALL2,..." ("" oder "none" = leer). Prueft und
++// normalisiert (Grossbuchstaben, ohne Leerzeichen). false = ungueltig, die
++// alte Liste bleibt dann unveraendert. Speichert NICHT.
++bool blockListSet(const char *csv);
++
++// Aktuelle Liste als "CALL1,CALL2" ("" = leer).
++const char *blockListCsv(void);
++
++// true, wenn das Rufzeichen selbst gesperrt ist.
++bool isBlockedCall(const char *call);
++
++// true, wenn irgendein Element eines kommagetrennten Pfads gesperrt ist
++// ("SRC,RELAY1,RELAY2", Relais ggf. mit '*').
++bool isBlockedInPath(const char *path);
++
++// Gesamtentscheidung fuer einen empfangenen Frame.
++inline bool isBlockedFrame(const char *source_call, const char *path)
++{
++    return isBlockedCall(source_call) || isBlockedInPath(path);
++}
++
++#endif // _BLOCKED_CALLS_H_
+diff --git a/src/command_functions.cpp b/src/command_functions.cpp
+index 415e19d5..0981af8e 100644
+--- a/src/command_functions.cpp
++++ b/src/command_functions.cpp
+@@ -135,6 +135,7 @@ extern TinyGPSPlus gps;
+ #include "gw_link_status.h"   // --info ...Server line
+ #include "gw_reg_runtime.h"   // --info ...REGISTRATION line
+ #include "nvs_diag.h"         // --info ...NVS line
++#include "blocked_calls.h"    // --blockcall (Sperrliste)
+ 
+ #if defined(BOARD_T5_EPAPER)
+ #include <t5-epaper/t5epaper_extern.h>
+@@ -1430,6 +1431,7 @@ void commandAction(char *umsg_text, bool ble)
+             #if defined(ENABLE_MSGSTORE)
+             printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--stor on/off           announce mailbox calls to the server (STOR, default off)\n--mbox                  store-node mailbox contents\n");
+             #endif
++            printdeb("--blockcall <list>/none blocked callsigns, not shown or relayed (CALL = all SSIDs)\n");
+             printdeb("--mesh on/off           relay foreign frames\n");
+             printdeb("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)\n");
+             printdeb("--rmstrictsecurity on/off  RM brute-force protection (default off): per-sender lockout,\n"
+@@ -4694,6 +4696,25 @@ void commandAction(char *umsg_text, bool ble)
+     // storenotice must be tested before the bare "store"/"storenotice" below --
+     // "store" (5 chars) alone would otherwise not reach them, but "storenotice"
+     // (11 chars) as an exact token would shadow "storenotice " if reordered.
++    // Sperrliste (blocked_calls.h): --blockcall CALL1,CALL2 / none / ohne Wert anzeigen.
++    if(commandCheck(msg_text+2, (char*)"blockcall ") == 0)
++    {
++        if(!blockListSet(msg_text+12))
++        {
++            Serial.printf("[ERR];blockcall;invalid entry or more than %d entries\n", BLOCKLIST_MAX);
++            return;
++        }
++        blockListSave();
++        Serial.printf("[BLOCK];list;%s\n", blockListCsv());
++        return;
++    }
++    else
++    if(commandCheck(msg_text+2, (char*)"blockcall") == 0)
++    {
++        Serial.printf("[BLOCK];list;%s\n", blockListCsv());
++        return;
++    }
++    else
+ #if defined(ENABLE_MSGSTORE)
+     if(commandCheck(msg_text+2, (char*)"storecall ") == 0)
+     {
+diff --git a/src/esp32/esp32_main.cpp b/src/esp32/esp32_main.cpp
+index 8586516a..0bb5a3b5 100644
+--- a/src/esp32/esp32_main.cpp
++++ b/src/esp32/esp32_main.cpp
+@@ -143,6 +143,7 @@ Arduino_GFX *gfx = new Arduino_ST7796(
+ #include "msgstore_api.h"
+ #include "msgstore_settings.h"
+ #endif
++#include "blocked_calls.h"     // Sperrliste (--blockcall)
+ #include <regex_functions.h>
+ #include <test_inject.h>
+ #include <command_functions.h>
+@@ -1324,6 +1325,9 @@ void esp32setup()
+     msgstoreSettingsLoad();
+ #endif
+ 
++    // Sperrliste (blocked_calls.h): gespeicherte Liste laden, sonst Standard.
++    blockListLoad();
++
+     // RM-05 (#1189): remote-management state (high-water mark from its own NVS key), after the
+     // settings load so node_call/node_passwd are final.
+     rmInit();
+diff --git a/src/esp32/udp_frame_esp32.cpp b/src/esp32/udp_frame_esp32.cpp
+index fee76e15..20c398d7 100644
+--- a/src/esp32/udp_frame_esp32.cpp
++++ b/src/esp32/udp_frame_esp32.cpp
+@@ -53,6 +53,8 @@ extern String strSource_call;
+ extern bool had_initial_udp_conn;
+ extern IPAddress node_hostip;
+ void logRxDropUnconfigured(const char *call);
++void logRxDropBlocked(const char *path);
++#include "blocked_calls.h"
+ 
+ // UDP functions
+ // DR-20 (2026-09-12 decided, implemented 2026-09-17 wave W6): returns a
+@@ -203,6 +205,15 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
+           if(bSrcUnconfigured)
+               logRxDropUnconfigured(source_call);
+ 
++          // Lokale Sperrliste (blocked_calls.h): gesperrte Quelle/Relais wie eine
++          // unkonfigurierte Quelle behandeln -- kein Senden auf LoRa, kein KISS,
++          // keine Anzeige.
++          if(!bSrcUnconfigured && isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
++          {
++              logRxDropBlocked(aprsmsg.msg_source_path);
++              bSrcUnconfigured = true;
++          }
++
+           // TM-31: read the dedup gate BEFORE the position branch below inserts
+           // this msg_id into the ring. It used to be evaluated after that insert,
+           // so every UDP position frame deduplicated against the entry it had
+diff --git a/src/lora_functions.cpp b/src/lora_functions.cpp
+index d5782d5d..a19f8643 100644
+--- a/src/lora_functions.cpp
++++ b/src/lora_functions.cpp
+@@ -28,6 +28,7 @@
+ #include "rm_rx_gate.h"     // RM: the one receive hook, shared with the server ingress
+ #include "hey_echo_upload.h"  // gateway upload of own HEY echoes
+ #include "onrx_stats.h"     // OR-STAT: OnRxDone time histogram for the STAT line
++#include "blocked_calls.h"   // lokale Sperrliste (--blockcall)
+ #if defined(ENABLE_MSGSTORE)
+ #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
+ #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
+@@ -307,6 +308,29 @@ void logRxDropUnconfigured(const char *call)
+     }
+ }
+ 
++// Sperrliste (blocked_calls.h): eigener Zaehler, gleiche Drosselung wie oben.
++uint32_t stat_rx_drop_blocked = 0;
++
++void logRxDropBlocked(const char *path)
++{
++    static bool s_have_marker = false;
++    static uint32_t s_last_marker_ms = 0;
++    static uint32_t s_dropped_since_marker = 0;
++
++    stat_rx_drop_blocked++;
++    s_dropped_since_marker++;
++
++    uint32_t now = (uint32_t)millis();
++    if(!s_have_marker || (uint32_t)(now - s_last_marker_ms) >= 10000UL)
++    {
++        Serial.printf("[RX];drop;blocked;path;%s;ms;%lu;dropped;%lu\n",
++                      path, (unsigned long)now, (unsigned long)s_dropped_since_marker);
++        s_have_marker = true;
++        s_last_marker_ms = now;
++        s_dropped_since_marker = 0;
++    }
++}
++
+ // DR-25 (docs/testplan/drift-matrix.csv, U2): the outbound UDP-out drain's
+ // own copy of the RX-01 idea (esp32/udp_drain_esp32.cpp, nrf52/udp_drain_
+ // nrf52.cpp) detects an unconfigured-source frame AFTER the send has already
+@@ -1458,6 +1482,22 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
+                 setlogPrint(setlog_buf);
+             }
+         }
++        else if(isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
++        {
++            // Lokale Sperrliste (blocked_calls.h): Quelle oder Relais ohne
++            // Lizenz -- verwerfen wie RX-01 oben: keine Anzeige, kein
++            // Phone/BLE, kein Server-Upload, kein Relay. Der Frame wird
++            // NICHT in den Dedup-Ring eingetragen, eine saubere Kopie
++            // desselben Frames ueber ein anderes Relais bleibt also gueltig.
++            logRxDropBlocked(aprsmsg.msg_source_path);
++
++            if(bDisplayLog && !rx_dup)
++            {
++                setlogFormatRly(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
++                                aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, "blocked", 0, -1);
++                setlogPrint(setlog_buf);
++            }
++        }
+         else
+         {
+             // NBR (Konzept ~/Desktop/Nachbarschaftsmatrix.html 4.1/4.4,
+diff --git a/src/nrf52/nrf52_main.cpp b/src/nrf52/nrf52_main.cpp
+index 458028e6..0f189eed 100644
+--- a/src/nrf52/nrf52_main.cpp
++++ b/src/nrf52/nrf52_main.cpp
+@@ -135,6 +135,7 @@ void sendHeartbeat();
+ #include "msgstore_api.h"
+ #include "msgstore_settings.h"
+ #endif
++#include "blocked_calls.h"     // Sperrliste (--blockcall)
+ #include <regex_functions.h>
+ #include "onrx_stats.h" // OR-STAT
+ #include "setlog_lines.h"
+@@ -650,6 +651,9 @@ void nrf52setup()
+     msgstoreSettingsLoad();
+ #endif
+ 
++    // Sperrliste (blocked_calls.h): gespeicherte Liste laden, sonst Standard.
++    blockListLoad();
++
+     // RM-05 (#1189): remote-management state (high-water mark from its own flash file), after the
+     // settings load so node_call/node_passwd are final.
+     rmInit();
+diff --git a/src/nrf52/udp_frame_nrf52.cpp b/src/nrf52/udp_frame_nrf52.cpp
+index 39746550..9a054aab 100644
+--- a/src/nrf52/udp_frame_nrf52.cpp
++++ b/src/nrf52/udp_frame_nrf52.cpp
+@@ -56,6 +56,8 @@ extern bool hasExternIPaddress;
+ // DR-02: shared with the ESP32 copy (lora_functions.cpp defines it,
+ // udp_frame_esp32.cpp:40 already externs it the same way).
+ void logRxDropUnconfigured(const char *call);
++void logRxDropBlocked(const char *path);
++#include "blocked_calls.h"
+ 
+ /**@brief C1 carve-out (DRY unification U1): everything that happens once a
+  * datagram is in the buffer -- no socket, no NTP, no DHCP. Returns 0 when the
+@@ -196,6 +198,15 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
+           if(bSrcUnconfigured)
+               logRxDropUnconfigured(source_call);
+ 
++          // Lokale Sperrliste (blocked_calls.h): gesperrte Quelle/Relais wie eine
++          // unkonfigurierte Quelle behandeln -- kein Senden auf LoRa, kein KISS,
++          // keine Anzeige.
++          if(!bSrcUnconfigured && isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
++          {
++              logRxDropBlocked(aprsmsg.msg_source_path);
++              bSrcUnconfigured = true;
++          }
++
+           bool bUDPtoLoraSend = !bSrcUnconfigured;
+ 
+ #if defined(ENABLE_MSGSTORE)
+diff --git a/src/web_functions/web_functions.cpp b/src/web_functions/web_functions.cpp
+index a70a8e63..8867526e 100644
+--- a/src/web_functions/web_functions.cpp
++++ b/src/web_functions/web_functions.cpp
+@@ -2,6 +2,7 @@
+  *  @author      Ralph Weich (DD5RW)
+  *  @date        2025-12-03
+  */
++#include "blocked_calls.h"   // Sperrliste: Setup-Karte "Blocked callsigns"
+ #include "mc_text.h"
+ #include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
+ #include <Arduino.h>
+@@ -3807,6 +3808,20 @@ void sub_page_setup()
+     web_client.println("</div>");
+ #endif
+ 
++    // Sperrliste (blocked_calls.h): Rufzeichen, deren Frames verworfen und nicht
++    // weitergeleitet werden. Gleiches Muster wie die Store-Karte oben.
++    web_client.println("<div class=\"cardlayout collapsablecard\">");
++    web_client.println("<label class=\"cardlabel\">Blocked callsigns</label>");
++    web_client.println("<span>Open this to see and edit the callsigns this node ignores.</span>\n");
++    web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
++    web_client.println("<div class=\"cardbody\">");
++    web_client.println("<div class=\"grid grid3\">");
++    _create_setup_textinput_element("blockcall", "Blocked callsigns (comma separated, up to 16)", blockListCsv(), "XX1ABC,XX9XYZ-12", "blockcall", BLOCKLIST_CSV_MAX, false, false);
++    web_client.println("</div>");
++    web_client.println("<div class=\"mbx-warn\">Frames <b>from</b> or <b>relayed by</b> a listed callsign are dropped: not shown, not uploaded, not relayed. A callsign without SSID (<b>XX1ABC</b>) blocks all its SSIDs, with SSID (<b>XX1ABC-12</b>) only that one. An empty field clears the list.</div>");
++    web_client.println("</div>"); // cardbody
++    web_client.println("</div>");
++
+     // Config Backup / Restore Section (CS-03)
+     // The download is a plain navigation to /config.json -- the response
+     // carries a Content-Disposition, so the browser saves it instead of
+diff --git a/src/web_functions/web_setup.cpp b/src/web_functions/web_setup.cpp
+index 15a36f85..1524e6cb 100644
+--- a/src/web_functions/web_setup.cpp
++++ b/src/web_functions/web_setup.cpp
+@@ -7,6 +7,7 @@ This file contains all web-based setup functions
+ #include <loop_functions.h>
+ #include <loop_functions_extern.h>
+ #include <command_setters.h> // cmdDecimalComma
++#include <blocked_calls.h> // Sperrliste: blockcall setparam mapping
+ #if defined(ENABLE_MSGSTORE)
+ #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
+ #endif
+@@ -557,6 +558,25 @@ void webSetup_setParam(setupStruct *setupData){
+         return;
+     } else
+ 
++    // Sperrliste (blocked_calls.h): wie storecall ueber den Konsolenbefehl, damit
++    // Web-GUI und Konsole nicht auseinanderlaufen. Leeres Feld = Liste leeren.
++    if(setupData->paramName.equals("blockcall")) {
++        String want = setupData->paramValue;
++        want.trim();
++        if(want.length() == 0)
++            want = "none";
++        snprintf(message_text, sizeof(message_text), "--blockcall %s", want.c_str());
++        commandAction(message_text, bPhoneReady);
++        String norm = want;
++        norm.toUpperCase();
++        norm.replace(" ", "");
++        if(norm.equals("NONE"))
++            norm = "";
++        setupData->returnCode = norm.equals(blockListCsv())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
++        setupData->returnValue = blockListCsv();
++        return;
++    } else
++
+     #if defined(ENABLE_MSGSTORE)
+     // Stage 3 store node (docs/dm-stage3-wave-plan-20260914.md): five commands owned by sibling
+     // C (command_functions.cpp), reached from the mailbox setup card the same way every other
+@@ -1162,6 +1182,11 @@ void webSetup_getParam(setupStruct *setupData){
+         return;
+     } else
+ 
++    if(setupData->paramName.equals("blockcall")) {
++        setupData->returnValue = blockListCsv();
++        return;
++    } else
++
+     #if defined(ENABLE_MSGSTORE)
+     if(setupData->paramName.equals("store")) {
+         setupData->returnValue = msgstoreModeName(msgstoreMode());
+diff --git a/test/test_udp_frame_twin/test_udp_frame_twin.cpp b/test/test_udp_frame_twin/test_udp_frame_twin.cpp
+index 72afe5a7..095989d2 100644
+--- a/test/test_udp_frame_twin/test_udp_frame_twin.cpp
++++ b/test/test_udp_frame_twin/test_udp_frame_twin.cpp
+@@ -397,6 +397,7 @@ static void record_sink(const char *sink, const std::string &detail)
+     g_sink_log.push_back(SinkCall{sink, sink_sanitize(detail)});
+ }
+ 
++void logRxDropBlocked(const char *) {}   // Sperrliste: im Twin ohne Bedeutung
+ void logRxDropUnconfigured(const char *call)
+ {
+     g_dropped.push_back(call ? call : "(null)");
