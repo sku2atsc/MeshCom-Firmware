@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Inoffizieller Fork von DM3KS, nur fuer den Umkreis von DB0SD** (Sperrliste gegen eine Station ohne Amateurfunklizenz). Alle anderen verwenden bitte die offizielle Firmware von [icssw-org](https://github.com/icssw-org/MeshCom-Firmware/releases) bzw. den Build von [DK5EN](https://github.com/DK5EN/MeshCom-Firmware/releases). Build-Details: [REZEPT.md](REZEPT.md).
+
 # MeshCom
 MeshCom is indeed an exciting project of the Institute of Citizen Science for Space & Wireless communication (www.icssw.org)  aimed at creating a resilient, text-based communication tool for amateur radio operators. It utilizes LORA™ modulation technology and the APRS protocol to establish a mesh network in the 70cm band. The main objectives of MeshCom are to realize a connected off-grid messaging system with low energy consumption and cost-effective hardware. The technical implementation is based on LORA™  radio modules, which can transmit messages, positions, measurements, and more over long distances with low transmit power. MeshCom modules can be connected to form a mesh network or establish a messaging network via MeshCom gateways, ideally connected through HAMNET.
 
