@@ -38,12 +38,12 @@ DK5EN \`$BASE\`, Byte fuer Byte. Inhalt und Neuerungen: siehe [DK5EN $BASE]($D).
 EOF
 else
 cat <<EOF
-## MeshCom-Firmware $TAG mit Sperrliste (DM3KS)
+## MeshCom-Firmware $TAG (DM3KS Test)
 
 > [!WARNING]
-> **Dieser Build existiert nur aus einem Grund:** Im Umkreis von **DB0SD** sendet derzeit eine Station ohne Amateurfunklizenz (Pirat) ins MeshCom-Netz. Diese Firmware verwirft deren Aussendungen, damit sie nicht weiter durchs Mesh transportiert werden.
+> **Nur fuer Testzwecke von DM3KS.** Dieser Fork haelt die eigenen Knoten ueber den Auto-Update-Kanal an diesem Repo, damit hier Aenderungen ausprobiert werden koennen, bevor sie (vielleicht) bei DK5EN landen.
 >
-> **Wer nicht direkt davon betroffen ist, verwendet bitte die offizielle Firmware:** [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware/releases) bzw. den Build von [DK5EN](https://github.com/DK5EN/MeshCom-Firmware/releases). Dies ist **kein** offizielles Release.
+> **Bitte nicht verwenden**, sondern die offizielle Firmware von [icssw-org](https://github.com/icssw-org/MeshCom-Firmware/releases) bzw. den Build von [DK5EN](https://github.com/DK5EN/MeshCom-Firmware/releases). Dies ist **kein** offizielles Release.
 
 ### What this release is
 

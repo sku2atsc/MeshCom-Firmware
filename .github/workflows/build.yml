@@ -247,7 +247,7 @@ jobs:
       with:
         tag: ${{ needs.plan.outputs.tag }}
         commit: ${{ github.sha }}
-        name: ${{ needs.plan.outputs.tag }} (Sperrliste DM3KS)
+        name: ${{ needs.plan.outputs.tag }} (DM3KS Test)
         bodyFile: notes.md
         allowUpdates: true
         draft: false

@@ -1,8 +1,9 @@
-# MeshCom-Firmware mit Sperrliste (DM3KS)
+# MeshCom-Firmware -- Test-Fork von DM3KS
 
-> **Nur fuer den Einsatz im Umkreis von DB0SD**, wo derzeit eine Station ohne
-> Amateurfunklizenz ins MeshCom-Netz sendet. Alle anderen verwenden bitte die
-> offizielle Firmware von [icssw-org](https://github.com/icssw-org/MeshCom-Firmware/releases)
+> **Nur fuer Testzwecke von DM3KS.** Der Auto-Update-Kanal `dev` der eigenen
+> Knoten zeigt auf dieses Repo, damit hier Aenderungen als Patch ausprobiert
+> werden koennen. Alle anderen verwenden bitte die offizielle Firmware von
+> [icssw-org](https://github.com/icssw-org/MeshCom-Firmware/releases)
 > bzw. den Build von [DK5EN](https://github.com/DK5EN/MeshCom-Firmware/releases).
 
 Dieser Branch enthaelt **keinen Firmware-Code**, sondern nur das Rezept:
