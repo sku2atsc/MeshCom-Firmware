@@ -47,15 +47,14 @@ cat <<EOF
 
 ### What this release is
 
-DK5EN \`$BASE\` mit zwei kleinen Ergaenzungen (siehe unten). Inhalt und Neuerungen des Basis-Release: siehe [DK5EN $BASE]($D). Die **Sperrliste** selbst (Web-GUI, \`--blockcall\`, Fernwartung) ist seit \`v4.40a.10.23\` Teil der DK5EN-Firmware.
+DK5EN \`$BASE\` mit einer einzigen Aenderung (siehe unten). Inhalt und Neuerungen des Basis-Release: siehe [DK5EN $BASE]($D). Die **Sperrliste** selbst (Web-GUI, \`--blockcall\`, Fernwartung) ist seit \`v4.40a.10.23\` Teil der DK5EN-Firmware.
 
 ### Unterschiede zum DK5EN-Build $BASE
 
-1. **Voreinstellung der Sperrliste:** Auf einem Knoten, auf dem noch **nie** eine Sperrliste gespeichert war, wird beim ersten Start einmalig das betroffene Rufzeichen (alle SSIDs) eingetragen und gespeichert. Eine schon vorhandene oder bewusst geleerte Liste bleibt unveraendert.
-2. **Auto-Update-Kanal dev** (\`--updchan dev\`, Web-GUI "notify (dev, DM3KS releases)") zeigt auf **diesen Fork** statt auf DK5EN. Der Kanal **prod** zeigt weiterhin auf die offizielle Firmware von icssw-org.
-3. **Nur ausgewaehlte Boards** gebaut (siehe Tabelle), nicht alle wie bei DK5EN.
+1. **Auto-Update-Kanal dev** (\`--updchan dev\`, Web-GUI "notify (dev, DM3KS releases)") zeigt auf **diesen Fork** statt auf DK5EN. Der Kanal **prod** zeigt weiterhin auf die offizielle Firmware von icssw-org.
+2. **Nur ausgewaehlte Boards** gebaut (siehe Tabelle), nicht alle wie bei DK5EN.
 
-Alles andere (Funktionen, Einstellungen, Protokoll) entspricht DK5EN \`$BASE\`. Die Einstellungen bleiben beim Wechsel erhalten; eine im Fork gespeicherte Sperrliste wird uebernommen.
+Alles andere (Funktionen, Einstellungen, Protokoll) entspricht DK5EN \`$BASE\`. Die Einstellungen und eine gespeicherte Sperrliste bleiben beim Update erhalten.
 
 ### Firmware zum Download
 

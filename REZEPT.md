@@ -9,7 +9,7 @@ Dieser Branch enthaelt **keinen Firmware-Code**, sondern nur das Rezept:
 
 | Datei | Zweck |
 |---|---|
-| `patches/` | Aenderungen gegenueber DK5EN (Auto-Update-Kanal, Voreinstellung der Sperrliste) |
+| `patches/` | Aenderung gegenueber DK5EN: nur der Auto-Update-Kanal dev zeigt auf diesen Fork |
 | `boards.txt` | welche Boards gebaut werden |
 | `.github/workflows/build.yml` | holt DK5EN, wendet die Patches an, baut parallel, veroeffentlicht |
 | `tools/collect_assets.sh` | benennt die Build-Ergebnisse wie bei DK5EN |
