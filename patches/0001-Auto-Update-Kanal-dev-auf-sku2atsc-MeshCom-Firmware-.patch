@@ -1,14 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: DM3KS <sku2atsc@users.noreply.github.com>
 Date: Sat, 31 Oct 2026 08:24:32 +0100
-Subject: [PATCH] Auto-Update: Kanal dev auf sku2atsc/MeshCom-Firmware (DM3KS)
+Subject: [PATCH] Auto-Update: Kanal dev auf sku2atsc/MeshCom-Firmware (DM3KS),
+ Voreinstellung dev
 
 ---
  src/command_functions.cpp           | 2 +-
  src/fw_update.h                     | 2 +-
+ src/meshcom_settings.h              | 2 +-
  src/web_functions/web_functions.cpp | 2 +-
  test/test_fw_update/test_main.cpp   | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/src/command_functions.cpp b/src/command_functions.cpp
 index ef8f9148..50b1531b 100644
@@ -36,6 +38,19 @@ index e6479295..94c820ab 100644
  #endif
      (void)c;
      return "icssw-org/MeshCom-Firmware";
+diff --git a/src/meshcom_settings.h b/src/meshcom_settings.h
+index 377dbcf0..2fb4f6c5 100644
+--- a/src/meshcom_settings.h
++++ b/src/meshcom_settings.h
+@@ -207,7 +207,7 @@
+     /* mapped to 1 by sanitize_loaded_settings(). Default notify on ESP32, 0 on nRF52 (no AU there). Persisted; console rung ESP32 only. */ \
+     M(int, node_autoupd, MC_PLATFORM_DEFAULT(1, 0))                                                      \
+     /* AU-03 (#1187): update channel, 0 prod (icssw-org) / 1 dev (DK5EN); default 0. Persisted. */           \
+-    M(int, node_updchan, 0)                                                                              \
++    M(int, node_updchan, 1)   /* DM3KS-Fork: Voreinstellung dev (= dieser Fork) */                      \
+     /* gateway registration state (src/gw_reg_runtime.cpp): flag + callsign at entry. Persisted, not exported. */ \
+     M(int, node_gwrf, 0)                                                                                 \
+     A(char, node_gwrc, [10], {0})
 diff --git a/src/web_functions/web_functions.cpp b/src/web_functions/web_functions.cpp
 index 7ab10ab0..869f43ae 100644
 --- a/src/web_functions/web_functions.cpp

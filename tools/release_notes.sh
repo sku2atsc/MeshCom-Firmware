@@ -51,7 +51,7 @@ DK5EN \`$BASE\` mit einer einzigen Aenderung (siehe unten). Inhalt und Neuerunge
 
 ### Unterschiede zum DK5EN-Build $BASE
 
-1. **Auto-Update-Kanal dev** (\`--updchan dev\`, Web-GUI "notify (dev, DM3KS releases)") zeigt auf **diesen Fork** statt auf DK5EN. Der Kanal **prod** zeigt weiterhin auf die offizielle Firmware von icssw-org.
+1. **Auto-Update-Kanal dev** (\`--updchan dev\`, Web-GUI "notify (dev, DM3KS releases)") zeigt auf **diesen Fork** statt auf DK5EN und ist **voreingestellt** (auch nach \`--reset\` oder Neu-Flashen mit Loeschen). Der Kanal **prod** zeigt weiterhin auf die offizielle Firmware von icssw-org.
 2. **Nur ausgewaehlte Boards** gebaut (siehe Tabelle), nicht alle wie bei DK5EN.
 
 Alles andere (Funktionen, Einstellungen, Protokoll) entspricht DK5EN \`$BASE\`. Die Einstellungen und eine gespeicherte Sperrliste bleiben beim Update erhalten.
