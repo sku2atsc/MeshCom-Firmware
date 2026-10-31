@@ -1,8 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: DM3KS <sku2atsc@users.noreply.github.com>
-Date: Sat, 24 Oct 2026 10:39:42 +0200
-Subject: [PATCH 1/2] Auto-Update: Kanal dev auf sku2atsc/MeshCom-Firmware
- (DM3KS)
+Date: Sat, 31 Oct 2026 08:24:32 +0100
+Subject: [PATCH] Auto-Update: Kanal dev auf sku2atsc/MeshCom-Firmware (DM3KS)
 
 ---
  src/command_functions.cpp           | 2 +-
@@ -12,54 +11,54 @@ Subject: [PATCH 1/2] Auto-Update: Kanal dev auf sku2atsc/MeshCom-Firmware
  4 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/src/command_functions.cpp b/src/command_functions.cpp
-index 4914aa7f..2718c91c 100644
+index ef8f9148..50b1531b 100644
 --- a/src/command_functions.cpp
 +++ b/src/command_functions.cpp
-@@ -1412,7 +1412,7 @@ void commandAction(char *umsg_text, bool ble)
-             printdeb("--ota-update            reboot into safeboot OTA\n");
-             #endif
-             #if defined(ESP32)
--            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
-+            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DM3KS\n--update check/install/status/apply  firmware update now (ESP32)\n");
-             #endif
-             printdeb("--conffin               send config-finished to app\n");
-             delay(100);
+@@ -842,7 +842,7 @@ static void cmdPosRange(const char *label, const char *range, const char *msg_te
+ 
+ // --help text of --updchan: the dev channel exists only in fork builds (fw_update.h)
+ #if defined(MC_AU_DEV_CHANNEL)
+-#define AU_UPDCHAN_HELP "prod/dev       update source: prod icssw-org, dev DK5EN"
++#define AU_UPDCHAN_HELP "prod/dev       update source: prod icssw-org, dev DM3KS"
+ #else
+ #define AU_UPDCHAN_HELP "prod           update source: icssw-org releases"
+ #endif
 diff --git a/src/fw_update.h b/src/fw_update.h
-index e1c6b98c..0d308f3b 100644
+index e6479295..94c820ab 100644
 --- a/src/fw_update.h
 +++ b/src/fw_update.h
-@@ -209,7 +209,7 @@ enum FwChannel : uint8_t
- // Unknown values fall back to prod.
- inline const char *fwChannelRepo(FwChannel c)
+@@ -220,7 +220,7 @@ inline const char *fwChannelRepo(FwChannel c)
  {
--    return c == FW_CH_DEV ? "DK5EN/MeshCom-Firmware" : "icssw-org/MeshCom-Firmware";
-+    return c == FW_CH_DEV ? "sku2atsc/MeshCom-Firmware" : "icssw-org/MeshCom-Firmware";
- }
- 
- // ---------------------------------------------------------------------------
+ #if FW_HAS_DEV_CHANNEL
+     if (c == FW_CH_DEV)
+-        return "DK5EN/MeshCom-Firmware";
++        return "sku2atsc/MeshCom-Firmware";   // DM3KS-Fork: dev-Kanal auf diesen Fork
+ #endif
+     (void)c;
+     return "icssw-org/MeshCom-Firmware";
 diff --git a/src/web_functions/web_functions.cpp b/src/web_functions/web_functions.cpp
-index 7e60ed80..d6ad4900 100644
+index 7ab10ab0..869f43ae 100644
 --- a/src/web_functions/web_functions.cpp
 +++ b/src/web_functions/web_functions.cpp
-@@ -3530,7 +3530,7 @@ void sub_page_setup()
-         web_client.printf("<select id=\"aumode\" name=\"aumode\"%s onchange=\"setvalue('aumode',this.value,true);\">\r\n", au_sb_ok ? "" : " disabled");
+@@ -3579,7 +3579,7 @@ void sub_page_setup()
          // D3: notify (prod), notify (dev), auto greyed. A console-set auto shows greyed and selected.
          web_client.printf("\t<option value=\"prod\" %s>notify (prod, icssw-org releases)</option>\n", (au_mode != 2 && au_chan == 0) ? "selected" : "");
+ #if defined(MC_AU_DEV_CHANNEL)   // dev channel: fork builds only (fw_update.h)
 -        web_client.printf("\t<option value=\"dev\" %s>notify (dev, DK5EN releases)</option>\n", (au_mode != 2 && au_chan == 1) ? "selected" : "");
 +        web_client.printf("\t<option value=\"dev\" %s>notify (dev, DM3KS releases)</option>\n", (au_mode != 2 && au_chan == 1) ? "selected" : "");
+ #endif
          web_client.printf("\t<option value=\"auto\" disabled %s>auto (coming soon)</option>\n", (au_mode == 2) ? "selected" : "");
          web_client.println("</select>");
-         web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto: coming soon -- for now the node notifies only. Install new firmware from the Info page.</p>");
 diff --git a/test/test_fw_update/test_main.cpp b/test/test_fw_update/test_main.cpp
-index d4e89e1c..835bb78f 100644
+index ec56526c..053ed419 100644
 --- a/test/test_fw_update/test_main.cpp
 +++ b/test/test_fw_update/test_main.cpp
-@@ -208,7 +208,7 @@ static void test_compare_invalid_is_zero(void)
- static void test_channel_repos(void)
- {
+@@ -210,7 +210,7 @@ static void test_channel_repos(void)
      TEST_ASSERT_EQUAL_STRING("icssw-org/MeshCom-Firmware", fwChannelRepo(FW_CH_PROD));
+ #if defined(MC_AU_DEV_CHANNEL)
+     TEST_ASSERT_EQUAL_INT(1, FW_HAS_DEV_CHANNEL);
 -    TEST_ASSERT_EQUAL_STRING("DK5EN/MeshCom-Firmware", fwChannelRepo(FW_CH_DEV));
 +    TEST_ASSERT_EQUAL_STRING("sku2atsc/MeshCom-Firmware", fwChannelRepo(FW_CH_DEV));
-     TEST_ASSERT_EQUAL_UINT8(0, FW_CH_PROD);
-     TEST_ASSERT_EQUAL_UINT8(1, FW_CH_DEV);
-     // an out-of-range stored value falls back to prod
+ #else
+     // native_fw_update_prod, the upstream build: no dev channel, a stored dev reads prod
+     TEST_ASSERT_EQUAL_INT(0, FW_HAS_DEV_CHANNEL);
