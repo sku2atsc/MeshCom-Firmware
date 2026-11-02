@@ -16,7 +16,7 @@ Dieser Branch enthaelt **keinen Firmware-Code**, sondern nur das Rezept:
 | `tools/collect_assets.sh` | benennt die Build-Ergebnisse wie bei DK5EN |
 | `tools/release_notes.sh` | Release-Text |
 
-## Uebergabe-Modus (derzeit aus)
+## Uebergabe-Modus (aktiv seit 2026-11-02)
 
 Legt man eine Datei `UEBERGABE` an, wird **nicht** mehr gebaut: der Workflow
 kopiert dann jedes neue DK5EN-Release unveraendert hierher. Knoten mit diesem

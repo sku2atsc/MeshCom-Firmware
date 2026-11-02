@@ -19,7 +19,7 @@ cat <<EOF
 ## MeshCom-Firmware $TAG -- Uebergabe an DK5EN
 
 > [!IMPORTANT]
-> **Dies ist das unveraenderte Release [DK5EN $BASE]($D)**, nur hierher kopiert. Die Sperrliste ist seit \`$BASE\` fester Bestandteil der Firmware von DK5EN, dieser Fork wird nicht mehr gebraucht.
+> **Dies ist das unveraenderte Release [DK5EN $BASE]($D)**, nur hierher kopiert. Der Test-Fork von DM3KS wird damit beendet: Knoten, die bisher hier ihre Updates geholt haben, holen sie nach der Installation direkt bei DK5EN.
 
 ### What this release is
 
@@ -27,9 +27,9 @@ DK5EN \`$BASE\`, Byte fuer Byte. Inhalt und Neuerungen: siehe [DK5EN $BASE]($D).
 
 ### Fuer Knoten, die bisher diesen Fork verwendet haben
 
-- Nach der Installation zeigt der Auto-Update-Kanal **dev** (\`--updchan dev\`) wieder auf **DK5EN**. Kuenftige Updates kommen direkt von dort.
-- Eine **gespeicherte Sperrliste wird uebernommen** (beim ersten Start einmalig migriert).
-- **Wichtig:** Die Voreinstellung aus dem Fork gilt in der DK5EN-Firmware nicht. Wurde die Liste nie gespeichert, ist sie nach dem Update **leer**. Bitte nach dem Update pruefen und ggf. neu setzen (Web-GUI Setup, \`--blockcall <CALL>\` oder per Fernwartung).
+- Die Einstellung **dev** (\`--updchan dev\`) bleibt beim Update erhalten und zeigt danach auf **DK5EN**. Kuenftige Updates kommen direkt von dort.
+- Einstellungen und die gespeicherte Sperrliste bleiben erhalten.
+- Hinweis: In der DK5EN-Firmware ist ab Werk **prod** voreingestellt. Nach \`--reset\` oder Neu-Flashen mit Loeschen muss \`--updchan dev\` erneut gesetzt werden.
 
 ### Firmware zum Download
 
